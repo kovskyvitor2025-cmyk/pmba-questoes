@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="admin-head">
+  <div><span class="tag">ADMIN</span><h1>{{form_title}}</h1><p class="muted">Selecione a divisão, a matéria e o conteúdo diretamente do edital cadastrado.</p></div>
+  <a class="button secondary" href="{{url_for('admin_questions')}}">Voltar</a>
+</div>
+<form class="card question-form" method="post">
+  <div class="form-grid">
+    <label>Divisão da questão
+      <select name="categoria" id="categoria" required>
+        <option value="">Selecione</option>
+        <option value="SD" {% if q and q.categoria=='SD' %}selected{% endif %}>SD — Soldado</option>
+        <option value="CFO" {% if q and q.categoria=='CFO' %}selected{% endif %}>CFO — Oficial</option>
+      </select>
+    </label>
+    <label>Matéria
+      <select name="materia_id" id="materia_id" required>
+        <option value="">Selecione a divisão primeiro</option>
+        {% for m in edital_materias %}
+        <option value="{{m.id}}" {% if q and q.materia_id==m.id %}selected{% endif %}>{{m.nome}}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Conteúdo do edital
+      <select name="conteudo_id" id="conteudo_id" required>
+        <option value="">Selecione a matéria primeiro</option>
+        {% if q and q.conteudo %}
+        <option value="{{q.conteudo.id}}" selected>{{q.conteudo.nome}}</option>
+        {% endif %}
+      </select>
+    </label>
+    <label>Banca<input name="banca" required value="{{q.banca if q else ''}}" placeholder="Ex.: UNEB"></label>
+    <label>Ano<input type="number" name="ano" required min="1900" max="2100" value="{{q.ano if q else ''}}" placeholder="2026"></label>
+  </div>
+  <div class="card" style="margin:16px 0;background:#f7f9fc">
+    <strong>Classificação:</strong>
+    <span id="classificacao">Selecione a divisão, matéria e conteúdo.</span>
+  </div>
+  <label>Texto-base <span class="muted">(opcional; use para questões que tenham texto)</span>
+    <textarea name="texto_base" rows="8" placeholder="Cole aqui o texto da questão, quando houver...">{{q.texto_base if q and q.texto_base else ''}}</textarea>
+  </label>
+  <label>Enunciado<textarea name="enunciado" rows="5" required placeholder="Digite o enunciado da questão...">{{q.enunciado if q else ''}}</textarea></label>
+  <h2>Alternativas</h2>
+  <div class="alternatives">
+    {% for x in 'abcde' %}<label>{{x|upper}}<textarea name="alternativa_{{x}}" rows="3" required>{{q|attr('alternativa_'+x) if q else ''}}</textarea></label>{% endfor %}
+  </div>
+  <div class="form-grid">
+    <label>Gabarito<select name="gabarito" required><option value="">Selecione</option>{% for x in 'ABCDE' %}<option value="{{x}}" {% if q and q.gabarito==x %}selected{% endif %}>{{x}}</option>{% endfor %}</select></label>
+  </div>
+  <label>Explicação / comentário do gabarito<textarea name="explicacao" rows="7" required placeholder="Explique por que a alternativa correta é a resposta...">{{q.explicacao if q else ''}}</textarea></label>
+  <button type="submit">{{submit_label}}</button>
+</form>
+<script>
+const categoria = document.getElementById('categoria');
+const materia = document.getElementById('materia_id');
+const conteudo = document.getElementById('conteudo_id');
+const classificacao = document.getElementById('classificacao');
+const selectedMateria = "{{ q.materia_id if q and q.materia_id else '' }}";
+const selectedConteudo = "{{ q.conteudo_id if q and q.conteudo_id else '' }}";
+
+async function loadMaterias(keep=false) {
+  materia.innerHTML = '<option value="">Carregando matérias...</option>';
+  conteudo.innerHTML = '<option value="">Selecione a matéria primeiro</option>';
+  if (!categoria.value) { materia.innerHTML='<option value="">Selecione a divisão primeiro</option>'; return; }
+  const res = await fetch('/api/materias/' + categoria.value);
+  const data = await res.json();
+  materia.innerHTML = '<option value="">Selecione</option>' + data.materias.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+  if (keep && selectedMateria) materia.value = selectedMateria;
+  if (materia.value) await loadConteudos(keep);
+  updateClassificacao();
+}
+async function loadConteudos(keep=false) {
+  conteudo.innerHTML = '<option value="">Carregando conteúdos...</option>';
+  if (!materia.value) { conteudo.innerHTML='<option value="">Selecione a matéria primeiro</option>'; updateClassificacao(); return; }
+  const res = await fetch('/api/conteudos/' + materia.value);
+  const data = await res.json();
+  conteudo.innerHTML = '<option value="">Selecione</option>' + data.conteudos.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+  if (keep && selectedConteudo) conteudo.value = selectedConteudo;
+  updateClassificacao();
+}
+function updateClassificacao() {
+  const m = materia.options[materia.selectedIndex]?.text || '';
+  const c = conteudo.options[conteudo.selectedIndex]?.text || '';
+  classificacao.textContent = categoria.value && m && c ? `${categoria.value} → ${m} → ${c}` : 'Selecione a divisão, matéria e conteúdo.';
+}
+categoria.addEventListener('change', () => loadMaterias(false));
+materia.addEventListener('change', () => loadConteudos(false));
+conteudo.addEventListener('change', updateClassificacao);
+if (categoria.value) loadMaterias(true); else updateClassificacao();
+</script>
+{% endblock %}

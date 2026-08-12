@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><span class="tag">RESOLVER QUESTÕES</span><h1>Monte sua sessão</h1><p class="muted">Use a estrutura oficial do edital para estudar exatamente o conteúdo que deseja.</p></div>
+<form class="card question-form" method="post">
+<div class="form-grid">
+<label>Divisão<select name="categoria" id="resolver_categoria"><option value="">SD + CFO</option>{% for code,name in categorias %}<option value="{{code}}">{{name}}</option>{% endfor %}</select></label>
+<label>Matéria<select name="materia_id" id="resolver_materia"><option value="">Todas</option>{% for m in materias %}<option value="{{m.id}}">{{m.nome}}</option>{% endfor %}</select></label>
+<label>Conteúdo<select name="conteudo_id" id="resolver_conteudo"><option value="">Todos</option>{% for c in conteudos %}<option value="{{c.id}}">{{c.nome}}</option>{% endfor %}</select></label>
+<label>Banca<select name="banca"><option value="">Todas</option>{% for x in bancas %}<option value="{{x}}">{{x}}</option>{% endfor %}</select></label>
+<label>Quantidade<select name="quantidade"><option>5</option><option selected>10</option><option>20</option><option>30</option><option>50</option><option>100</option></select></label>
+</div><button type="submit">Começar sessão</button></form>
+<div class="card"><p><strong>Plano atual:</strong> {{plan_name}}</p>{% if daily_remaining is not none %}<p><strong>Limite gratuito:</strong> 20 questões por dia. Restam <strong>{{daily_remaining}}</strong> hoje.</p>{% else %}<p><strong>Acesso premium:</strong> sem limite diário.</p>{% endif %}<a class="button" href="{{url_for('plans')}}">Conhecer Elite SD, Elite CFO e Elite Pro</a></div>
+<script>
+const rc=document.getElementById('resolver_categoria'), rm=document.getElementById('resolver_materia'), rco=document.getElementById('resolver_conteudo');
+rc.addEventListener('change', async()=>{rm.innerHTML='<option value="">Todas</option>';rco.innerHTML='<option value="">Todos</option>';if(!rc.value)return;const d=await (await fetch('/api/materias/'+rc.value)).json();rm.innerHTML='<option value="">Todas</option>'+d.materias.map(x=>`<option value="${x.id}">${x.nome}</option>`).join('');});
+rm.addEventListener('change', async()=>{rco.innerHTML='<option value="">Todos</option>';if(!rm.value)return;const d=await (await fetch('/api/conteudos/'+rm.value)).json();rco.innerHTML='<option value="">Todos</option>'+d.conteudos.map(x=>`<option value="${x.id}">${x.nome}</option>`).join('');});
+</script>{% endblock %}

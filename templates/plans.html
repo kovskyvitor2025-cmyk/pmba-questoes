@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-head"><span class="tag">ACESSO</span><h1>Planos de preparação</h1><p class="muted">Escolha sua trilha e solicite a ativação pelo WhatsApp.</p></div>
+<div class="plan-grid">
+  <div class="plan-card"><span class="plan-badge">GRATUITO</span><h2>Gratuito</h2><p>Para começar a estudar.</p><div class="price">R$ 0</div><ul><li>SD + CFO</li><li>Até {{daily_limit}} questões por dia</li><li>+3 XP por acerto</li><li>Desempenho e caderno de erros</li></ul><strong class="current">Seu plano atual: {{plan_name}}</strong></div>
+  {% for key, title, desc, features, cls in [
+    ('ELITE_SD','Elite SD','Foco total na preparação de Soldado',['Questões SD','Acesso sem limite diário','Simulados e estatísticas','Caderno de erros'],'elite'),
+    ('ELITE_CFO','Elite CFO','Foco total na preparação de Oficial',['Questões CFO','Acesso sem limite diário','Simulados e estatísticas','Caderno de erros'],'elite'),
+    ('ELITE_PRO','Elite Pro SD + CFO','Acesso completo às duas trilhas',['SD + CFO','Acesso sem limite diário','Todos os recursos de estudo','Preparação completa'],'pro')
+  ] %}
+  <div class="plan-card {{cls}}"><span class="plan-badge">{% if key == 'ELITE_PRO' %}ELITE PRO{% else %}ELITE{% endif %}</span><h2>{{title}}</h2><p>{{desc}}</p><div class="price">R$ {{'%.2f'|format(plan_prices[key])|replace('.', ',')}} <small>/ mês</small></div><ul>{% for feature in features %}<li>{{feature}}</li>{% endfor %}</ul>
+    {% if current_user.plano == key %}<strong class="current">Seu plano atual</strong>{% else %}
+      <form method="post" action="{{url_for('request_plan_purchase', plano=key)}}"><button class="button plan-buy">Assinar pelo WhatsApp</button></form>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% if not whatsapp_configured %}<div class="alert warning">O WhatsApp de vendas ainda não foi configurado pelo administrador.</div>{% endif %}
+{% if pending_payments %}<div class="card"><h2>Solicitações pendentes</h2><p class="muted">Você já solicitou estes planos. Fale com o atendimento pelo WhatsApp para concluir o pagamento.</p><div class="table-wrap"><table><thead><tr><th>Pedido</th><th>Plano</th><th>Valor</th><th>Status</th></tr></thead><tbody>{% for item in pending_payments %}<tr><td>#{{item.id}}</td><td>{{plans[item.plano]}}</td><td>R$ {{'%.2f'|format(item.valor)|replace('.', ',')}}</td><td><span class="status">Pendente</span></td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+<div class="card"><h2>Como funciona o pagamento</h2><ol><li>Clique em <strong>Assinar pelo WhatsApp</strong>.</li><li>O WhatsApp abrirá uma conversa com o atendimento já com seu plano e número do pedido.</li><li>O atendimento informa a forma de pagamento e confirma o recebimento.</li><li>Após a confirmação, o administrador aprova o pedido e seu plano é liberado.</li></ol><p class="muted">O site não guarda dados de cartão. A confirmação do pagamento é feita pelo atendimento.</p></div>
+{% endblock %}

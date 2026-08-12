@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Painel | PMBA Questões{% endblock %}
+{% block content %}
+<div class="hero">
+  <div><p class="eyebrow">PREPARAÇÃO PMBA</p><h1>Olá, {{current_user.username}}.</h1><p>Resolva questões, acompanhe seus erros e evolua até a sua próxima patente.</p></div>
+  <div class="rank"><strong>{{level}}</strong><span>{{current_user.xp}} XP</span><small>Plano: {{plan_name}}</small></div>
+</div>
+<div class="grid3">
+  <div class="stat"><b>{{questoes}}</b><span>Questões disponíveis</span></div>
+  <div class="stat"><b>{{stats.acertos}}</b><span>Acertos</span></div>
+  <div class="stat"><b>{{stats.aproveitamento}}%</b><span>Aproveitamento</span></div>
+</div>
+<div class="grid3">
+  <div class="stat"><b>{{stats.erros}}</b><span>Erros</span></div>
+  <div class="stat"><b>{{stats.streak}}</b><span>Sequência atual</span></div>
+  <div class="stat"><b>{% if daily_remaining is none %}Ilimitado{% else %}{{daily_remaining}}{% endif %}</b><span>Questões restantes hoje</span></div>
+</div>
+<div class="grid2">
+  <a class="category-card sd" href="{{url_for('resolver')}}"><span>SD</span><h2>Preparação Soldado</h2><p>Treine para as provas de Soldado com questões direcionadas.</p></a>
+  <a class="category-card cfo" href="{{url_for('resolver')}}"><span>CFO</span><h2>Preparação Oficial</h2><p>Treine para o CFO com questões de nível de Oficial.</p></a>
+</div>
+<div class="card quick-links"><h2>Continuar estudando</h2><a class="button" href="{{url_for('resolver')}}">Resolver questões</a><a class="button secondary" href="{{url_for('simulado')}}">Fazer simulado</a><a class="button secondary" href="{{url_for('error_notebook')}}">Caderno de erros</a></div>
+<div class="card"><h2>Seu progresso</h2><div class="progress"><div style="width:{{progress}}%"></div></div><p>{{current_user.xp}} XP {% if next_xp > current_user.xp %}• próximo nível em {{next_xp-current_user.xp}} XP{% else %}• nível máximo{% endif %}</p></div>
+<div class="card"><h2>Patentes</h2><div class="levels">{% for name,xp in levels %}<div class="level {% if current_user.xp>=xp %}done{% endif %}"><span>{{name}}</span><small>{{xp}} XP</small></div>{% endfor %}</div></div>
+<div class="card plan-mini"><h2>Seu acesso</h2><p><strong>{{plan_name}}</strong>{% if daily_remaining is not none %} — você respondeu {{daily_count}} de 20 questões hoje.{% else %} — acesso premium sem limite diário.{% endif %}</p><a class="button" href="{{url_for('plans')}}">Ver planos Elite</a><a class="button secondary" href="{{url_for('feedback')}}">Enviar feedback</a></div>
+{% endblock %}
