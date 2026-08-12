@@ -808,44 +808,158 @@ def admin_questions():
                            materias=materias, conteudos=conteudos, materia_id=materia_id, conteudo_id=conteudo_id)
 
 def question_form_data(form):
-    categoria = form.get('categoria', '').upper()
+    categoria = form.get('categoria', '').strip().upper()
     banca = form.get('banca', '').strip()
     ano_raw = form.get('ano', '').strip()
+
+    # Aceita IDs ou nomes. Isso permite importar CSV sem selecionar
+    # matéria/conteúdo manualmente no formulário.
     materia_id = form.get('materia_id', '').strip()
     conteudo_id = form.get('conteudo_id', '').strip()
+
+    # Novo formato do CSV
+    materia_nome = form.get('materia', '').strip()
+    conteudo_nome = form.get('conteudo', '').strip()
+
+    # Compatibilidade com o formato antigo do sistema
+    if not materia_nome:
+        materia_nome = form.get('disciplina', '').strip()
+    if not conteudo_nome:
+        conteudo_nome = form.get('assunto', '').strip()
+
     enunciado = form.get('enunciado', '').strip()
     texto_base = form.get('texto_base', '').strip() or None
     alternativas = {k: form.get(f'alternativa_{k}', '').strip() for k in 'abcde'}
-    gabarito = form.get('gabarito', '').upper()
+    gabarito = form.get('gabarito', '').strip().upper()
     explicacao = form.get('explicacao', '').strip()
 
-    if not banca or not enunciado or any(not v for v in alternativas.values()) or gabarito not in 'ABCDE' or not explicacao:
-        raise ValueError('Preencha todos os campos obrigatórios e escolha um gabarito entre A e E.')
+    if (
+        categoria not in CATEGORY_VALUES
+        or not banca
+        or not enunciado
+        or any(not v for v in alternativas.values())
+        or gabarito not in 'ABCDE'
+        or not explicacao
+    ):
+        raise ValueError(
+            'Preencha todos os campos obrigatórios e escolha um gabarito entre A e E.'
+        )
+
     try:
         ano = int(ano_raw)
-    except ValueError:
+    except (ValueError, TypeError):
         raise ValueError('Informe um ano válido.')
+
     if ano < 1900 or ano > 2100:
         raise ValueError('Informe um ano entre 1900 e 2100.')
 
-    if not materia_id:
-        legacy_materia = form.get('disciplina', '').strip()
-        materia_obj = Materia.query.filter_by(categoria=categoria, nome=legacy_materia).first()
-        materia_id = materia_obj.id if materia_obj else ''
-    if not conteudo_id:
-        legacy_conteudo = form.get('assunto', '').strip()
-        if materia_id and legacy_conteudo:
-            conteudo_obj = Conteudo.query.filter_by(materia_id=int(materia_id), nome=legacy_conteudo).first()
-            conteudo_id = conteudo_obj.id if conteudo_obj else ''
-    materia, conteudo = validate_edital_selection(categoria, materia_id, conteudo_id)
-    return dict(categoria=categoria, banca=banca, ano=ano,
-                disciplina=materia.nome, assunto=conteudo.nome,
-                materia_id=materia.id, conteudo_id=conteudo.id,
-                enunciado=enunciado, texto_base=texto_base,
-                alternativa_a=alternativas['a'], alternativa_b=alternativas['b'],
-                alternativa_c=alternativas['c'], alternativa_d=alternativas['d'],
-                alternativa_e=alternativas['e'], gabarito=gabarito,
-                explicacao=explicacao)
+    # ---------------------------------------------------------
+    # LOCALIZA A MATÉRIA
+    # ---------------------------------------------------------
+    materia_obj = None
+
+    if materia_id:
+        try:
+            materia_obj = db.session.get(Materia, int(materia_id))
+        except (ValueError, TypeError):
+            materia_obj = None
+
+    if not materia_obj and materia_nome:
+        materia_obj = (
+            Materia.query
+            .filter_by(categoria=categoria, nome=materia_nome)
+            .first()
+        )
+
+    if not materia_obj:
+        raise ValueError(
+            f'Matéria não encontrada para a categoria {categoria}: '
+            f'"{materia_nome}".'
+        )
+
+    # Garante que uma matéria informada por ID também pertence à categoria.
+    if materia_obj.categoria != categoria:
+        raise ValueError(
+            f'A matéria "{materia_obj.nome}" não pertence à divisão {categoria}.'
+        )
+
+    # ---------------------------------------------------------
+    # LOCALIZA O CONTEÚDO
+    # ---------------------------------------------------------
+    conteudo_obj = None
+
+    if conteudo_id:
+        try:
+            conteudo_obj = db.session.get(Conteudo, int(conteudo_id))
+        except (ValueError, TypeError):
+            conteudo_obj = None
+
+    if not conteudo_obj and conteudo_nome:
+        # Primeiro tenta a correspondência exata.
+        conteudo_obj = (
+            Conteudo.query
+            .filter_by(materia_id=materia_obj.id, nome=conteudo_nome)
+            .first()
+        )
+
+        # Fallback robusto para CSV: ignora diferenças de espaços,
+        # quebras de linha, caixa e espaços Unicode sem alterar o nome
+        # oficial armazenado no edital.
+        if not conteudo_obj:
+            import unicodedata
+
+            def _normalizar_edital(valor):
+                valor = str(valor or '').replace('\\r', ' ').replace('\\n', ' ')
+                valor = unicodedata.normalize('NFKC', valor)
+                valor = ' '.join(valor.split())
+                # O edital pode armazenar pontuação final no nome do
+                # conteúdo, enquanto o CSV pode omiti-la.
+                valor = valor.casefold().strip()
+                valor = valor.rstrip(' .;')
+                return valor
+
+            alvo = _normalizar_edital(conteudo_nome)
+            candidatos = Conteudo.query.filter_by(
+                materia_id=materia_obj.id
+            ).all()
+
+            conteudo_obj = next(
+                (
+                    item for item in candidatos
+                    if _normalizar_edital(item.nome) == alvo
+                ),
+                None
+            )
+
+    if not conteudo_obj:
+        raise ValueError(
+            f'Conteúdo não encontrado para a matéria "{materia_obj.nome}": '
+            f'"{conteudo_nome}".'
+        )
+
+    if conteudo_obj.materia_id != materia_obj.id:
+        raise ValueError(
+            'O conteúdo selecionado não pertence à matéria informada.'
+        )
+
+    return dict(
+        categoria=categoria,
+        banca=banca,
+        ano=ano,
+        disciplina=materia_obj.nome,
+        assunto=conteudo_obj.nome,
+        materia_id=materia_obj.id,
+        conteudo_id=conteudo_obj.id,
+        enunciado=enunciado,
+        texto_base=texto_base,
+        alternativa_a=alternativas['a'],
+        alternativa_b=alternativas['b'],
+        alternativa_c=alternativas['c'],
+        alternativa_d=alternativas['d'],
+        alternativa_e=alternativas['e'],
+        gabarito=gabarito,
+        explicacao=explicacao
+    )
 
 
 @app.route('/admin/questoes/nova', methods=['GET', 'POST'])
@@ -900,8 +1014,13 @@ def admin_import():
         if not file or not file.filename.lower().endswith('.csv'): flash('Envie um arquivo CSV.', 'danger'); return redirect(url_for('admin_import'))
         try:
             content = file.read().decode('utf-8-sig'); reader = csv.DictReader(io.StringIO(content), delimiter=',')
-            required = {'categoria','banca','ano','disciplina','assunto','texto_base','enunciado','alternativa_a','alternativa_b','alternativa_c','alternativa_d','alternativa_e','gabarito','explicacao'}
-            if not reader.fieldnames or not required.issubset(set(reader.fieldnames)): flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
+            required_base = {'categoria','banca','ano','texto_base','enunciado','alternativa_a','alternativa_b','alternativa_c','alternativa_d','alternativa_e','gabarito','explicacao'}
+            required_location = ({'materia','conteudo'}, {'disciplina','assunto'}, {'materia_id','conteudo_id'})
+            if not reader.fieldnames or not required_base.issubset(set(reader.fieldnames)):
+                flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
+            if not any(pair.issubset(set(reader.fieldnames)) for pair in required_location):
+                flash('CSV inválido. Informe matéria + conteúdo, disciplina + assunto, ou materia_id + conteudo_id.', 'danger'); return redirect(url_for('admin_import'))
+            if not reader.fieldnames or not required_base.issubset(set(reader.fieldnames)): flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
             created = 0
             for row in reader: db.session.add(Question(**question_form_data(row))); created += 1
             db.session.commit(); flash(f'{created} questão(ões) importada(s) com sucesso.', 'success'); return redirect(url_for('admin_questions'))
@@ -1027,12 +1146,68 @@ def seed_edital():
     print(f'Edital carregado: {len(SD_EDITAL)} matérias SD + {len(CFO_EDITAL)} matérias CFO.')
 
 
+def ensure_admin_user():
+    """Garante que o administrador definido nas variáveis de ambiente exista.
+
+    Isso é executado automaticamente no deploy/boot do Render, pois a instância
+    Free não disponibiliza Shell para executar `flask create-admin`.
+    """
+    username = os.environ.get('ADMIN_USERNAME', 'admin').strip()
+    email = os.environ.get('ADMIN_EMAIL', 'admin@pmba.local').strip().lower()
+    telefone = os.environ.get('ADMIN_TELEFONE', '00000000000').strip()
+    password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+    if not username or not email or not password:
+        app.logger.warning('ADMIN_USERNAME, ADMIN_EMAIL e ADMIN_PASSWORD devem estar configurados.')
+        return
+
+    existing = User.query.filter(
+        (User.username == username) | (User.email == email)
+    ).first()
+
+    if existing:
+        # Mantém o usuário existente, mas garante acesso administrativo
+        # e sincroniza a senha com ADMIN_PASSWORD do Render.
+        existing.is_admin = True
+        existing.password_hash = generate_password_hash(password)
+
+        # Só altera o telefone se estiver livre ou já pertencer ao próprio usuário.
+        if telefone:
+            phone_owner = User.query.filter(
+                User.telefone == telefone,
+                User.id != existing.id
+            ).first()
+            if not phone_owner:
+                existing.telefone = telefone
+
+        db.session.commit()
+        app.logger.info('Administrador garantido: %s (%s).', existing.username, existing.email)
+        return
+
+    # Evita conflito de telefone com outro usuário.
+    phone_owner = User.query.filter_by(telefone=telefone).first() if telefone else None
+    if phone_owner:
+        app.logger.warning(
+            'ADMIN_TELEFONE já pertence ao usuário %s. O administrador será criado '
+            'sem alterar o telefone existente.', phone_owner.username
+        )
+        telefone = f'admin-{username}-{datetime.utcnow().timestamp()}'
+
+    user = User(
+        username=username,
+        email=email,
+        telefone=telefone,
+        password_hash=generate_password_hash(password),
+        is_admin=True
+    )
+    db.session.add(user)
+    db.session.commit()
+    app.logger.info('Administrador criado automaticamente: %s (%s).', username, email)
+
+
 @app.cli.command('create-admin')
 def create_admin():
-    username = os.environ.get('ADMIN_USERNAME', 'admin'); email = os.environ.get('ADMIN_EMAIL', 'admin@pmba.local'); telefone = os.environ.get('ADMIN_TELEFONE', '00000000000'); password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-    existing = User.query.filter((User.username == username) | (User.email == email)).first()
-    if existing: existing.is_admin = True; db.session.commit(); print(f'Usuário {existing.username} agora é administrador.'); return
-    user = User(username=username, email=email, telefone=telefone, password_hash=generate_password_hash(password), is_admin=True); db.session.add(user); db.session.commit(); print(f'Administrador criado: {username} / senha: {password}')
+    ensure_admin_user()
 
 @app.cli.command('reset-db')
 def reset_db():
@@ -1046,6 +1221,11 @@ def health():
 
 with app.app_context():
     db.create_all()
+    try:
+        ensure_admin_user()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception('Não foi possível garantir o usuário administrador durante a inicialização.')
 
 
 if __name__ == '__main__':
