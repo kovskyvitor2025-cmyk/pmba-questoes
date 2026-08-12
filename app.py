@@ -1076,56 +1076,307 @@ def admin_question_stats(question_id):
 
 
 SD_EDITAL = {
-'Língua Portuguesa': [
-'Compreensão e interpretação de textos.','Tipologia textual e gêneros textuais.','Ortografia oficial.','Acentuação gráfica.','Classes de palavras.','Uso do sinal indicativo de crase.','Sintaxe da oração e do período.','Pontuação.','Concordância nominal e verbal.','Regência nominal e verbal.','Significação das palavras.'
-],
-'História do Brasil': [
-'Descobrimento do Brasil (1500).','Brasil Colônia (1530-1815): Capitanias Hereditárias, Economia, Extrativismo Vegetal, Extrativismo Mineral, Pecuária, Escravidão, Organização Político-Administrativa, Expansão Territorial.','Independência do Brasil (1822): a Nomeação do Príncipe Regente D. Pedro I, Dia do Fico, Reconhecimento da Independência do Brasil.','Primeiro Reinado (1822-1831).','Segundo Reinado (1831-1840).','Primeira República (1889-1930): o Primeiro Governo Provisório, Assembleia Constituinte, Presidência de Deodoro da Fonseca, a Política dos Governadores, o Coronelismo, Movimentos Tenentistas, Coluna Prestes, Revolta da Armada.','Revolução de 1930.','Era Vargas (1930-1945).','Os Presidentes do Brasil de 1964 à atualidade.','História da Bahia.','Independência da Bahia.','Revolta de Canudos.','Revolta dos Malês.','Conjuração Baiana.','Sabinada.'
-],
-'Geografia do Brasil': [
-'Relevo brasileiro.','Urbanização: crescimento urbano, problemas estruturais, contingente populacional brasileiro.','Tipos de fontes de energia que participam da matriz energética brasileira: eólica, hidráulica, biomassa, solar e a das marés.','Problemas Ambientais.','Clima: pressão atmosférica, umidade, temperatura, fatores que determinam o clima, mudanças climáticas e as suas consequências.','Geografia da Bahia: aspectos políticos, físicos, econômicos, sociais e culturais.'
-],
-'Matemática': [
-'Conjuntos numéricos: Números Naturais, Inteiros, Racionais, Reais e Complexos (forma algébrica e forma trigonométrica). Operações, propriedades e aplicações. Sequências numéricas, progressão aritmética e progressão geométrica.','Álgebra: Expressões algébricas. Polinômios: operações e propriedades. Equações polinomiais e inequações relacionadas.','Funções: generalidades. Funções elementares: 1º grau, 2º grau, modular, exponencial e logarítmica, gráficos. Propriedades.','Sistemas lineares, Matrizes e Determinantes: Propriedades, aplicações.','Análise Combinatória: Arranjos, Permutações e Combinações simples, Binômio de Newton e Probabilidade em espaços amostrais finitos.','Geometria e Medidas: Geometria plana: figuras geométricas, congruência, semelhança, perímetro e área. Geometria espacial: paralelismo, perpendicularismo entre retas e planos, áreas e volumes dos sólidos geométricos: prisma, pirâmide, cilindro, cone e esfera. Geometria analítica no plano: retas, circunferência e distâncias.','Trigonometria: razões trigonométricas, funções, fórmulas de transformações trigonométricas, equações e triângulos.'
-],
-'Atualidades': [
-'Globalização: conceitos, efeitos e implicações sociais, econômicas, políticas e culturais.','Multiculturalidade, Pluralidade e Diversidade Cultural.','Tecnologias de Informação e Comunicação: conceitos, efeitos e implicações sociais, econômicas, políticas e culturais.'
-],
-'Informática': [
-'Conceitos e modos de utilização de aplicativos para edição de textos (Word, Writer), planilhas (Excel, Calc), apresentações (PowerPoint, Impress); Microsoft Office (versão 2007 e superiores), LibreOffice (versão 5.0 e superiores).','Sistemas operacionais Windows 7, Windows 10 e Linux.','Organização e gerenciamento de informações, arquivos, pastas e programas.','Atalhos de teclado, ícones, área de trabalho e lixeira.','Conceitos básicos e modos de utilização de tecnologias, ferramentas, aplicativos e procedimentos associados à Internet e intranet.','Correio eletrônico.','Computação em nuvem.'
-],
-'Direito Constitucional': [
-'Constituição da República Federativa do Brasil: Dos princípios fundamentais.','Constituição da República Federativa do Brasil: Dos Direitos e garantias fundamentais.','Constituição da República Federativa do Brasil: Da organização do Estado.','Constituição da República Federativa do Brasil: Da Administração Pública.','Constituição da República Federativa do Brasil: Dos militares dos Estados, do Distrito Federal e dos Territórios.','Constituição da República Federativa do Brasil: Da Segurança Pública.','Constituição do Estado da Bahia: Dos princípios fundamentais.','Constituição do Estado da Bahia: Direitos e garantias fundamentais.','Constituição do Estado da Bahia: Dos Servidores Públicos Militares.','Constituição do Estado da Bahia: Da Segurança Pública.'
-],
-'Direitos Humanos': [
-'A Declaração Universal dos Direitos Humanos/1948.','Convenção Americana sobre Direitos Humanos/1969 (Pacto de São José da Costa Rica) (art. 1° ao 32).','Pacto Internacional dos Direitos Econômicos, Sociais e Culturais (art. 1° ao 15).','Declaração de Pequim Adotada pela Quarta Conferência Mundial sobre as Mulheres: Ação para Igualdade, Desenvolvimento e Paz.'
-],
-'Direito Administrativo': [
-'Administração Pública.','Princípios fundamentais da administração pública.','Poderes e deveres dos administradores públicos: uso e abuso do poder, poderes vinculado, discricionário, hierárquico, disciplinar e regulamentar, poder de polícia, deveres dos administradores públicos.','Servidores públicos: cargo, emprego e função públicos.','Regime jurídico do militar estadual: Estatuto dos Policiais Militares do Estado da Bahia (Lei estadual nº 7.990, de 27 de dezembro de 2001 - arts 1º ao 59).'
-],
-'Direito Penal': [
-'Do crime: Elementos.','Consumação e tentativa.','Desistência voluntária e arrependimento eficaz.','Arrependimento posterior.','Crime impossível.','Causas de exclusão de ilicitude e culpabilidade.','Contravenção.','Dos crimes contra a vida (homicídio, lesão corporal, rixa).','Dos crimes contra a liberdade pessoal (constrangimento ilegal, ameaça, perseguição, sequestro e cárcere privado).','Dos crimes contra o patrimônio (furto, roubo, extorsão, apropriação indébita, receptação).','Dos crimes contra a dignidade sexual (estupro, importunação sexual, assédio sexual).','Corrupção ativa.','Corrupção passiva.','Lei n° 9.455, de 07 de abril de 1997 (Crimes de tortura).'
-],
-'Igualdade Racial e de Gênero': [
-'Constituição da República Federativa do Brasil (art. 1°, 3°, 4° e 5°).','Constituição do Estado da Bahia, (Cap. XXIII “Do Negro”).','Lei n° 12.288, de 20 de julho de 2010 (Estatuto da Igualdade Racial).','Lei nº 7.716, de 5 de janeiro de 1989 e Lei n° 9.459, de 13 de maio de 1997 (crimes resultantes de preconceito de raça ou de cor).','Decreto n° 65.810, de 08 de dezembro de 1969 (Convenção internacional sobre a eliminação de todas as formas de discriminação racial).','Decreto n° 4.377, de 13 de setembro de 2002 (Convenção sobre a eliminação de todas as formas de discriminação contra a mulher).','Lei nº 11.340, de 7 de agosto de 2006 (Lei Maria da Penha).','Código Penal Brasileiro (art. 140).','Lei n° 9.455, de 7 de abril de 1997 (Crime de Tortura).','Lei nº 7.437, de 20 de dezembro de 1985 (Lei Caó).','Lei Estadual n° 10.549, de 28 de dezembro de 2006 (Secretaria de Promoção da Igualdade Racial).','Lei nº 10.678, de 23 de maio de 2003 (Secretaria de Políticas de Promoção da Igualdade Racial da Presidência da República).'
-],
-'Direito Penal Militar': [
-'Dos crimes contra a autoridade ou disciplina militar: motim, revolta, conspiração, aliciação para motim ou revolta.','Da violência contra superior ou militar de serviço.','Desrespeito a superior.','Recusa de obediência.','Reunião ilícita.','Publicação ou crítica indevida.','Resistência mediante ameaça ou violência.','Dos crimes contra o serviço militar e o dever militar: deserção, abandono de posto, descumprimento de missão, embriaguez em serviço, dormir em serviço.','Crimes contra a Administração Militar: desacato a superior, desacato a militar, desobediência, peculato, peculato-furto, concussão.','Dos crimes contra o dever funcional: prevaricação.'
-]}
+    'Língua Portuguesa': [
+        'Compreensão e interpretação de textos.',
+        'Tipologia textual e gêneros textuais.',
+        'Ortografia oficial.',
+        'Acentuação gráfica.',
+        'Classes de palavras.',
+        'Uso do sinal indicativo de crase.',
+        'Sintaxe da oração e do período.',
+        'Pontuação.',
+        'Concordância nominal e verbal.',
+        'Regência nominal e verbal.',
+        'Significação das palavras.'
+    ],
+
+    'História do Brasil': [
+        'Descobrimento do Brasil (1500).',
+        'Brasil Colônia (1530-1815): Capitanias Hereditárias, Economia, Extrativismo Vegetal, Extrativismo Mineral, Pecuária, Escravidão, Organização Político-Administrativa, Expansão Territorial.',
+        'Independência do Brasil (1822): a Nomeação do Príncipe Regente D. Pedro I, Dia do Fico, Reconhecimento da Independência do Brasil.',
+        'Primeiro Reinado (1822-1831).',
+        'Segundo Reinado (1831-1840).',
+        'Primeira República (1889-1930): o Primeiro Governo Provisório, Assembleia Constituinte, Presidência de Deodoro da Fonseca, a Política dos Governadores, o Coronelismo, Movimentos Tenentistas, Coluna Prestes, Revolta da Armada.',
+        'Revolução de 1930.',
+        'Era Vargas (1930-1945).',
+        'Os Presidentes do Brasil de 1964 à atualidade.',
+        'História da Bahia.',
+        'Independência da Bahia.',
+        'Revolta de Canudos.',
+        'Revolta dos Malês.',
+        'Conjuração Baiana.',
+        'Sabinada.'
+    ],
+
+    'Geografia do Brasil': [
+        'Relevo brasileiro.',
+        'Urbanização: crescimento urbano, problemas estruturais, contingente populacional brasileiro.',
+        'Tipos de fontes de energia que participam da matriz energética brasileira: eólica, hidráulica, biomassa, solar e a das marés.',
+        'Problemas Ambientais.',
+        'Clima: pressão atmosférica, umidade, temperatura, fatores que determinam o clima, mudanças climáticas e as suas consequências.',
+        'Geografia da Bahia: aspectos políticos, físicos, econômicos, sociais e culturais.'
+    ],
+
+    'Matemática': [
+        'Conjuntos numéricos: Números Naturais, Inteiros, Racionais, Reais e Complexos (forma algébrica e forma trigonométrica). Operações, propriedades e aplicações. Sequências numéricas, progressão aritmética e progressão geométrica.',
+        'Álgebra: Expressões algébricas. Polinômios: operações e propriedades. Equações polinomiais e inequações relacionadas.',
+        'Funções: generalidades. Funções elementares: 1º grau, 2º grau, modular, exponencial e logarítmica, gráficos. Propriedades.',
+        'Sistemas lineares, Matrizes e Determinantes: Propriedades, aplicações.',
+        'Análise Combinatória: Arranjos, Permutações e Combinações simples, Binômio de Newton e Probabilidade em espaços amostrais finitos.',
+        'Geometria e Medidas: Geometria plana: figuras geométricas, congruência, semelhança, perímetro e área. Geometria espacial: paralelismo, perpendicularismo entre retas e planos, áreas e volumes dos sólidos geométricos: prisma, pirâmide, cilindro, cone e esfera. Geometria analítica no plano: retas, circunferência e distâncias.',
+        'Trigonometria: razões trigonométricas, funções, fórmulas de transformações trigonométricas, equações e triângulos.'
+    ],
+
+    'Atualidades': [
+        'Globalização: conceitos, efeitos e implicações sociais, econômicas, políticas e culturais.',
+        'Multiculturalidade, Pluralidade e Diversidade Cultural.',
+        'Tecnologias de Informação e Comunicação: conceitos, efeitos e implicações sociais, econômicas, políticas e culturais.'
+    ],
+
+    'Informática': [
+        'Conceitos e modos de utilização de aplicativos para edição de textos (Word, Writer), planilhas (Excel, Calc), apresentações (PowerPoint, Impress); Microsoft Office (versão 2007 e superiores), LibreOffice (versão 5.0 e superiores).',
+        'Sistemas operacionais Windows 7, Windows 10 e Linux.',
+        'Organização e gerenciamento de informações, arquivos, pastas e programas.',
+        'Atalhos de teclado, ícones, área de trabalho e lixeira.',
+        'Conceitos básicos e modos de utilização de tecnologias, ferramentas, aplicativos e procedimentos associados à Internet e intranet.',
+        'Correio eletrônico.',
+        'Computação em nuvem.'
+    ],
+
+    'Direito Constitucional': [
+        'Constituição da República Federativa do Brasil: Dos princípios fundamentais.',
+        'Constituição da República Federativa do Brasil: Dos Direitos e garantias fundamentais.',
+        'Constituição da República Federativa do Brasil: Da organização do Estado.',
+        'Constituição da República Federativa do Brasil: Da Administração Pública.',
+        'Constituição da República Federativa do Brasil: Dos militares dos Estados, do Distrito Federal e dos Territórios.',
+        'Constituição da República Federativa do Brasil: Da Segurança Pública.',
+        'Constituição do Estado da Bahia: Dos princípios fundamentais.',
+        'Constituição do Estado da Bahia: Direitos e garantias fundamentais.',
+        'Constituição do Estado da Bahia: Dos Servidores Públicos Militares.',
+        'Constituição do Estado da Bahia: Da Segurança Pública.'
+    ],
+
+    'Direitos Humanos': [
+        'A Declaração Universal dos Direitos Humanos/1948.',
+        'Convenção Americana sobre Direitos Humanos/1969 (Pacto de São José da Costa Rica) (art. 1° ao 32).',
+        'Pacto Internacional dos Direitos Econômicos, Sociais e Culturais (art. 1° ao 15).',
+        'Declaração de Pequim Adotada pela Quarta Conferência Mundial sobre as Mulheres: Ação para Igualdade, Desenvolvimento e Paz.'
+    ],
+
+    'Direito Administrativo': [
+        'Administração Pública.',
+        'Princípios fundamentais da administração pública.',
+        'Poderes e deveres dos administradores públicos: uso e abuso do poder, poderes vinculado, discricionário, hierárquico, disciplinar e regulamentar, poder de polícia, deveres dos administradores públicos.',
+        'Servidores públicos: cargo, emprego e função públicos.',
+        'Regime jurídico do militar estadual: Estatuto dos Policiais Militares do Estado da Bahia (Lei estadual nº 7.990, de 27 de dezembro de 2001 - arts 1º ao 59).'
+    ],
+
+    'Direito Penal': [
+        'Do crime: Elementos.',
+        'Consumação e tentativa.',
+        'Desistência voluntária e arrependimento eficaz.',
+        'Arrependimento posterior.',
+        'Crime impossível.',
+        'Causas de exclusão de ilicitude e culpabilidade.',
+        'Contravenção.',
+        'Dos crimes contra a vida (homicídio, lesão corporal, rixa).',
+        'Dos crimes contra a liberdade pessoal (constrangimento ilegal, ameaça, perseguição, sequestro e cárcere privado).',
+        'Dos crimes contra o patrimônio (furto, roubo, extorsão, apropriação indébita, receptação).',
+        'Dos crimes contra a dignidade sexual (estupro, importunação sexual, assédio sexual).',
+        'Corrupção ativa.',
+        'Corrupção passiva.',
+        'Lei n° 9.455, de 07 de abril de 1997 (Crimes de tortura).'
+    ],
+
+    'Igualdade Racial e de Gênero': [
+        'Constituição da República Federativa do Brasil (art. 1°, 3°, 4° e 5°).',
+        'Constituição do Estado da Bahia, (Cap. XXIII “Do Negro”).',
+        'Lei n° 12.288, de 20 de julho de 2010 (Estatuto da Igualdade Racial).',
+        'Lei nº 7.716, de 5 de janeiro de 1989 e Lei n° 9.459, de 13 de maio de 1997 (crimes resultantes de preconceito de raça ou de cor).',
+        'Decreto n° 65.810, de 08 de dezembro de 1969 (Convenção internacional sobre a eliminação de todas as formas de discriminação racial).',
+        'Decreto n° 4.377, de 13 de setembro de 2002 (Convenção sobre a eliminação de todas as formas de discriminação contra a mulher).',
+        'Lei nº 11.340, de 7 de agosto de 2006 (Lei Maria da Penha).',
+        'Código Penal Brasileiro (art. 140).',
+        'Lei n° 9.455, de 7 de abril de 1997 (Crime de Tortura).',
+        'Lei nº 7.437, de 20 de dezembro de 1985 (Lei Caó).',
+        'Lei Estadual n° 10.549, de 28 de dezembro de 2006 (Secretaria de Promoção da Igualdade Racial).',
+        'Lei nº 10.678, de 23 de maio de 2003 (Secretaria de Políticas de Promoção da Igualdade Racial da Presidência da República).'
+    ],
+
+    'Direito Penal Militar': [
+        'Dos crimes contra a autoridade ou disciplina militar: motim, revolta, conspiração, aliciação para motim ou revolta.',
+        'Da violência contra superior ou militar de serviço.',
+        'Desrespeito a superior.',
+        'Recusa de obediência.',
+        'Reunião ilícita.',
+        'Publicação ou crítica indevida.',
+        'Resistência mediante ameaça ou violência.',
+        'Dos crimes contra o serviço militar e o dever militar: deserção, abandono de posto, descumprimento de missão, embriaguez em serviço, dormir em serviço.',
+        'Crimes contra a Administração Militar: desacato a superior, desacato a militar, desobediência, peculato, peculato-furto, concussão.',
+        'Dos crimes contra o dever funcional: prevaricação.'
+    ]
+}
 
 CFO_EDITAL = {
-'Língua Portuguesa': ['Leitura e interpretação de textos: verbais extraídos de livros e periódicos contemporâneos; mistos (verbais/não verbais) e não verbais; textos publicitários (propagandas, mensagens publicitárias, outdoors, etc).','Nomes e verbo. Flexões nominais e verbais.','Advérbio e suas circunstâncias de tempo, lugar, meio, intensidade, negação, afirmação, dúvida, etc.','Palavras de relação intervocabular e interoracional: preposições e conjunções.','Frase, oração, período. Elementos constituintes da oração: termos essenciais, integrantes e acessórios. Coordenação e Subordinação.','Sintaxe de colocação, concordância e regência. Crase.','Formas de discurso: direto, indireto e indireto livre.','Semântica: sinonímia, antonímia e heteronímia.','Pontuação e seus recursos sintático-semânticos.','Acentuação e ortografia.','Diferença entre redação técnica (oficial) e redação estilística e suas respectivas características.','Correspondência oficial: conceito e tipos de documentos.','Diferença entre ofício e memorando.'],
-'Língua Inglesa': ['Compreensão de textos verbais e não-verbais.','Substantivos: Formação do plural: regular, irregular e casos especiais.','Gênero. Contáveis e não-contáveis.','Formas possessivas dos nomes. Modificadores do nome.','Artigos e Demonstrativos: Definidos, indefinidos e outros determinantes. Demonstrativo de acordo com a posição, singular e plural.','Adjetivos: Grau comparativo e superlativo: regulares e irregulares. Indefinidos.','Numerais Cardinais e Ordinais.','Pronomes: Pessoais: sujeito e objeto.','Possessivos: substantivos e adjetivos. Reflexivos. Indefinidos. Interrogativos. Relativos.','Verbos (Modos, tempos e formas): Regulares e irregulares. Auxiliares e impessoais. Modais. Two-word verbs. Voz ativa e voz passiva. O gerúndio e seu uso específico.','Discurso direto e indireto. Sentenças condicionais.','Advérbios: Tipos: frequência, modo, lugar, tempo, intensidade, dúvida, afirmação.','Expressões adverbiais.','Palavras de relação: Preposições. Conjunções.','Derivação de palavras pelos processos de prefixação e sufixação. Semântica / sinonímia e antonímia.'],
-'Matemática': ['Conjuntos numéricos: Números Naturais, Inteiros, Racionais, Reais e Complexos (forma algébrica e forma trigonométrica). Operações, propriedades e aplicações. Sequências numéricas, progressão aritmética e progressão geométrica.','Álgebra: Expressões algébricas. Polinômios: operações e propriedades. Equações polinomiais e inequações relacionadas.','Funções: generalidades. Funções elementares: 1º grau, 2º grau, modular, exponencial e logarítmica, gráficos. Propriedades.','Sistemas lineares, Matrizes e Determinantes: Propriedades, aplicações.','Análise Combinatória: Arranjos, Permutações e Combinações simples, Binômio de Newton e Probabilidade em espaços amostrais finitos.','Geometria e Medidas: Geometria plana: figuras geométricas, congruência, semelhança, perímetro e área. Geometria espacial: paralelismo, perpendicularismo entre retas e planos, áreas e volumes dos sólidos geométricos: prisma, pirâmide, cilindro, cone e esfera. Geometria analítica no plano: retas, circunferência e distâncias.','Trigonometria: razões trigonométricas, funções, fórmulas de transformações trigonométricas, equações e triângulos.','Proporcionalidade e Finanças: Grandezas proporcionais: Porcentagem. Acréscimos e descontos. Juros: Capitalização simples e Capitalização composta.','Tratamento da Informação: Estatística: Estatística descritiva, resolução de problemas, tabelas, medidas de tendência central e medidas de dispersão. Gráficos estatísticos usuais.','Resolução de problemas envolvendo frações, conjuntos, porcentagens, sequências (com números, com figuras, de palavras).'],
-'Informática': ['Conceitos e modos de utilização de aplicativos para edição de textos (Word, Writer), planilhas (Excel, Calc) e apresentações (PowerPoint, Impress); Microsoft Office (versão 2007 e superiores) e LibreOffice (versão 5.0 e superiores).','Sistemas operacionais Windows 7, Windows 10 e Linux.','Organização e gerenciamento de informações, arquivos, pastas e programas.','Atalhos de teclado, ícones, área de trabalho e lixeira.','Conceitos básicos e modos de utilização de tecnologias, ferramentas, aplicativos e procedimentos associados à Internet e intranet.','Correio eletrônico.','Computação em nuvem.','Certificação e assinatura digital.','Segurança da Informação.','Componentes de um computador.','Dispositivos de armazenamento, processadores, memórias e periféricos.'],
-'Ciências Humanas': ['História: Antiguidade.','História: Mundo Medieval.','História: Mundo Moderno.','História: Mundo Contemporâneo.','História: Brasil Colônia.','História: Brasil Império.','História: Brasil República (de 1889 aos dias atuais).','História: Aspectos do desenvolvimento cultural e científico do Brasil no século XX.','História: A globalização e as questões ambientais.','História: História da Bahia.','História: Independência da Bahia.','História: Revolta de Canudos.','História: Revolta dos Malês.','História: Conjuração Baiana.','História: Sabinada.','História: Atualidades.','Geografia: A relação sociedade-natureza; os mecanismos da natureza; os recursos naturais e a sobrevivência do homem.','Geografia: As desigualdades na distribuição e na apropriação dos recursos naturais no mundo; uso dos recursos naturais e preservação do meio ambiente.','Geografia: Estruturação econômica, social e política do espaço mundial; capitalismo, industrialização, transnacionalização do capital; economias industriais e não industriais; transformações na relação cidade-campo; industrialização e desenvolvimento tecnológico; papel do Estado; mobilidade espacial e crescimento demográfico; divisão internacional e territorial do trabalho; fim da Guerra Fria, desagregação da URSS e nova ordem econômica mundial.','Geografia: Processo de ocupação e produção do espaço brasileiro; formação territorial; industrialização brasileira e internacionalização do capital; urbanização, metropolização e qualidade de vida; estrutura e produção agrária e impactos ambientais; população, crescimento, estrutura e migrações, condições de vida e de trabalho; papel do Estado e políticas territoriais; regionalização do Brasil.'],
-'Direito Constitucional': ['Constituição da República Federativa do Brasil: Dos princípios fundamentais.','Constituição da República Federativa do Brasil: Dos direitos e garantias fundamentais; dos direitos e deveres individuais e coletivos; da nacionalidade; dos direitos políticos.','Da organização do Estado; da Administração Pública; dos militares dos Estados, do Distrito Federal e dos Territórios.','Da Defesa do Estado e das Instituições Democráticas; das Forças Armadas; da segurança pública.','Constituição do Estado da Bahia: dos servidores públicos militares; do Poder Executivo; disposições gerais; atribuições do Governador do Estado; Justiça Militar; Segurança Pública; Família; Direitos Específicos da Mulher; Criança e Adolescente; Idoso; Deficiente; Negro; Índio.'],
-'Direitos Humanos': ['A Declaração Universal dos Direitos Humanos/1948.','Convenção Americana sobre Direitos Humanos/1969 (Pacto de São José da Costa Rica) (arts. 1º ao 32).','Convenção Internacional Sobre a Eliminação de Todas as Formas de Discriminação Racial (Decreto nº 65.810/69).','Convenção Sobre Eliminação de Todas as Formas de Discriminação Contra a Mulher (Decreto nº 4.377/02).','Estatuto da Igualdade Racial e de Combate a Intolerância Religiosa (Lei Estadual nº 13.182/14).'],
-'Direito Administrativo': ['Princípios fundamentais da administração pública.','Poderes administrativos: poder vinculado; poder discricionário; poder hierárquico; poder disciplinar; poder regulamentar; poder de polícia; uso e abuso do poder.','Atos administrativos: Conceito; Atributos; Requisitos; Classificação; Extinção.','Organização administrativa: Órgãos públicos: conceito e classificação; Entidades administrativas: conceito e espécies.','Agentes públicos: classificação.','Regime jurídico do militar estadual: Estatuto dos Policiais Militares do Estado da Bahia (Lei Estadual n.º 7.990/01 - arts 1º ao 92).','Lei Geral de Proteção de Dados Pessoais – LGPD (Lei n.º 13.709/2018 – arts 1º ao 32).'],
-'Direito Penal': ['Da aplicação da lei penal.','Lei penal no tempo.','Lei penal no espaço.','Do crime: Elementos.','Consumação e tentativa.','Desistência voluntária e arrependimento eficaz.','Arrependimento posterior.','Crime impossível.','Causas de exclusão de ilicitude e culpabilidade.','Dos crimes contra a pessoa (homicídio, feminicídio, lesão corporal, calúnia, difamação e injúria).','Dos crimes contra a liberdade pessoal (constrangimento ilegal, ameaça, sequestro e cárcere privado).','Dos crimes contra o patrimônio (furto, roubo, extorsão, apropriação indébita, receptação).','Dos crimes contra a dignidade sexual (estupro, importunação sexual, assédio sexual, estupro de vulnerável, corrupção de menores).','Dos crimes contra a paz pública (incitação ao crime, apologia de crime ou criminoso).','Dos crimes contra a administração pública (peculato e suas formas, concussão, corrupção passiva, prevaricação, condescendência criminosa, resistência, desobediência, desacato, corrupção ativa, contrabando).'],
-'Direito Processual Penal': ['Princípios do Processo Penal.','Inquérito Policial.','Da Prova: conceito, finalidade e obrigatoriedade; do exame de corpo de delito.','Da Prisão (arts 283 a 309 do CPP).','Lei das Contravenções Penais (Decreto-Lei n.º 3.688/41).','Contravenções penais: a prática de atos resultantes de preconceito de raça, de cor, de sexo ou de estado civil (Lei nº 7.437/85).','Lei nº 13.869/19: Das sanções de natureza civil e administrativa; Dos crimes e das penas.','Estatuto da Criança e do Adolescente (Lei n.º 8.069/90 – arts. 1º ao 6º; 15 a 18-B; 98 a 130; 225 a 258).','Lei que define os crimes resultantes de preconceito de raça ou de cor (Lei nº 7.716/89).','Estatuto da Pessoa com Deficiência (Lei nº 13.146/15 – arts 1º a 13; 88 a 91).','Crimes de Tortura (Lei n.º 9.455/97).','Estatuto do Idoso (Lei n.º 10.741/03 – arts 1º ao 10).','Lei Maria da Penha (Lei n.º 11.340/06).','Lei que institui o sistema nacional de políticas públicas sobre drogas (Lei n.º 11.343/06 – arts 1º ao 4º, 33 ao 39).'],
-'Direito Penal Militar': ['Dos crimes militares em tempo de paz.','Dos crimes contra a autoridade ou disciplina militar: motim, revolta, aliciação e incitamento; violência contra superior ou militar de serviço; desrespeito a superior e a símbolo nacional ou à farda; insubordinação; resistência.','Dos crimes contra o serviço militar e o dever militar: insubmissão; criação ou simulação de incapacidade física; deserção (arts 187 a 194); abandono de posto; descumprimento de missão; embriaguez em serviço; dormir em serviço.','Dos crimes contra a Administração Militar: desacato e desobediência.'],
-'Direito Processual Penal Militar': ['Do Inquérito Policial Militar.','Da prisão em flagrante.','Da deserção em geral.','Do processo de deserção do oficial.','Do processo de deserção de praça com ou sem graduação e de praça especial.']
+    'Língua Portuguesa': [
+        'Leitura e interpretação de textos: verbais extraídos de livros e periódicos contemporâneos; mistos (verbais/não verbais) e não verbais; textos publicitários (propagandas, mensagens publicitárias, outdoors, etc).',
+        'Nomes e verbo. Flexões nominais e verbais.',
+        'Advérbio e suas circunstâncias de tempo, lugar, meio, intensidade, negação, afirmação, dúvida, etc.',
+        'Palavras de relação intervocabular e interoracional: preposições e conjunções.',
+        'Frase, oração, período. Elementos constituintes da oração: termos essenciais, integrantes e acessórios. Coordenação e Subordinação.',
+        'Sintaxe de colocação, concordância e regência. Crase.',
+        'Formas de discurso: direto, indireto e indireto livre.',
+        'Semântica: sinonímia, antonímia e heteronímia.',
+        'Pontuação e seus recursos sintático-semânticos.',
+        'Acentuação e ortografia.',
+        'Diferença entre redação técnica (oficial) e redação estilística e suas respectivas características.',
+        'Correspondência oficial: conceito e tipos de documentos.',
+        'Diferença entre ofício e memorando.'
+    ],
+
+    'Língua Inglesa': [
+        'Compreensão de textos verbais e não-verbais.',
+        'Substantivos: Formação do plural: regular, irregular e casos especiais.',
+        'Gênero. Contáveis e não-contáveis.',
+        'Formas possessivas dos nomes. Modificadores do nome.',
+        'Artigos e Demonstrativos: Definidos, indefinidos e outros determinantes. Demonstrativo de acordo com a posição, singular e plural.',
+        'Adjetivos: Grau comparativo e superlativo: regulares e irregulares. Indefinidos.',
+        'Numerais Cardinais e Ordinais.',
+        'Pronomes: Pessoais: sujeito e objeto.',
+        'Possessivos: substantivos e adjetivos. Reflexivos. Indefinidos. Interrogativos. Relativos.',
+        'Verbos (Modos, tempos e formas): Regulares e irregulares. Auxiliares e impessoais. Modais. Two-word verbs. Voz ativa e voz passiva. O gerúndio e seu uso específico.',
+        'Discurso direto e indireto. Sentenças condicionais.',
+        'Advérbios: Tipos: frequência, modo, lugar, tempo, intensidade, dúvida, afirmação.',
+        'Expressões adverbiais.',
+        'Palavras de relação: Preposições. Conjunções.',
+        'Derivação de palavras pelos processos de prefixação e sufixação. Semântica / sinonímia e antonímia.'
+    ],
+
+    'Matemática': [
+        'Conjuntos numéricos: Números Naturais, Inteiros, Racionais, Reais e Complexos (forma algébrica e forma trigonométrica). Operações, propriedades e aplicações. Sequências numéricas, progressão aritmética e progressão geométrica.',
+        'Álgebra: Expressões algébricas. Polinômios: operações e propriedades. Equações polinomiais e inequações relacionadas.',
+        'Funções: generalidades. Funções elementares: 1º grau, 2º grau, modular, exponencial e logarítmica, gráficos. Propriedades.',
+        'Sistemas lineares, Matrizes e Determinantes: Propriedades, aplicações.',
+        'Análise Combinatória: Arranjos, Permutações e Combinações simples, Binômio de Newton e Probabilidade em espaços amostrais finitos.',
+        'Geometria e Medidas: Geometria plana: figuras geométricas, congruência, semelhança, perímetro e área. Geometria espacial: paralelismo, perpendicularismo entre retas e planos, áreas e volumes dos sólidos geométricos: prisma, pirâmide, cilindro, cone e esfera. Geometria analítica no plano: retas, circunferência e distâncias.',
+        'Trigonometria: razões trigonométricas, funções, fórmulas de transformações trigonométricas, equações e triângulos.',
+        'Proporcionalidade e Finanças: Grandezas proporcionais: Porcentagem. Acréscimos e descontos. Juros: Capitalização simples e Capitalização composta.',
+        'Tratamento da Informação: Estatística: Estatística descritiva, resolução de problemas, tabelas, medidas de tendência central e medidas de dispersão. Gráficos estatísticos usuais.',
+        'Resolução de problemas envolvendo frações, conjuntos, porcentagens, sequências (com números, com figuras, de palavras).'
+    ],
+
+    'Informática': [
+        'Conceitos e modos de utilização de aplicativos para edição de textos (Word, Writer), planilhas (Excel, Calc) e apresentações (PowerPoint, Impress); Microsoft Office (versão 2007 e superiores) e LibreOffice (versão 5.0 e superiores).',
+        'Sistemas operacionais Windows 7, Windows 10 e Linux.',
+        'Organização e gerenciamento de informações, arquivos, pastas e programas.',
+        'Atalhos de teclado, ícones, área de trabalho e lixeira.',
+        'Conceitos básicos e modos de utilização de tecnologias, ferramentas, aplicativos e procedimentos associados à Internet e intranet.',
+        'Correio eletrônico.',
+        'Computação em nuvem.',
+        'Certificação e assinatura digital.',
+        'Segurança da Informação.',
+        'Componentes de um computador.',
+        'Dispositivos de armazenamento, processadores, memórias e periféricos.'
+    ],
+
+    'Ciências Humanas': [
+        'História: Antiguidade.',
+        'História: Mundo Medieval.',
+        'História: Mundo Moderno.',
+        'História: Mundo Contemporâneo.',
+        'História: Brasil Colônia.',
+        'História: Brasil Império.',
+        'História: Brasil República (de 1889 aos dias atuais).',
+        'História: Aspectos do desenvolvimento cultural e científico do Brasil no século XX.',
+        'História: A globalização e as questões ambientais.',
+        'História: História da Bahia.',
+        'História: Independência da Bahia.',
+        'História: Revolta de Canudos.',
+        'História: Revolta dos Malês.',
+        'História: Conjuração Baiana.',
+        'História: Sabinada.',
+        'História: Atualidades.',
+        'Geografia: A relação sociedade-natureza; os mecanismos da natureza; os recursos naturais e a sobrevivência do homem.',
+        'Geografia: As desigualdades na distribuição e na apropriação dos recursos naturais no mundo; uso dos recursos naturais e preservação do meio ambiente.',
+        'Geografia: Estruturação econômica, social e política do espaço mundial; capitalismo, industrialização, transnacionalização do capital; economias industriais e não industriais; transformações na relação cidade-campo; industrialização e desenvolvimento tecnológico; papel do Estado; mobilidade espacial e crescimento demográfico; divisão internacional e territorial do trabalho; fim da Guerra Fria, desagregação da URSS e nova ordem econômica mundial.',
+        'Geografia: Processo de ocupação e produção do espaço brasileiro; formação territorial; industrialização brasileira e internacionalização do capital; urbanização, metropolização e qualidade de vida; estrutura e produção agrária e impactos ambientais; população, crescimento, estrutura e migrações, condições de vida e de trabalho; papel do Estado e políticas territoriais; regionalização do Brasil.'
+    ],
+
+    'Direito Constitucional': [
+        'Constituição da República Federativa do Brasil: Dos princípios fundamentais.',
+        'Constituição da República Federativa do Brasil: Dos direitos e garantias fundamentais; dos direitos e deveres individuais e coletivos; da nacionalidade; dos direitos políticos.',
+        'Da organização do Estado; da Administração Pública; dos militares dos Estados, do Distrito Federal e dos Territórios.',
+        'Da Defesa do Estado e das Instituições Democráticas; das Forças Armadas; da segurança pública.',
+        'Constituição do Estado da Bahia: dos servidores públicos militares; do Poder Executivo; disposições gerais; atribuições do Governador do Estado; Justiça Militar; Segurança Pública; Família; Direitos Específicos da Mulher; Criança e Adolescente; Idoso; Deficiente; Negro; Índio.'
+    ],
+
+    'Direitos Humanos': [
+        'A Declaração Universal dos Direitos Humanos/1948.',
+        'Convenção Americana sobre Direitos Humanos/1969 (Pacto de São José da Costa Rica) (arts. 1º ao 32).',
+        'Convenção Internacional Sobre a Eliminação de Todas as Formas de Discriminação Racial (Decreto nº 65.810/69).',
+        'Convenção Sobre Eliminação de Todas as Formas de Discriminação Contra a Mulher (Decreto nº 4.377/02).',
+        'Estatuto da Igualdade Racial e de Combate a Intolerância Religiosa (Lei Estadual nº 13.182/14).'
+    ],
+
+    'Direito Administrativo': [
+        'Princípios fundamentais da administração pública.',
+        'Poderes administrativos: poder vinculado; poder discricionário; poder hierárquico; poder disciplinar; poder regulamentar; poder de polícia; uso e abuso do poder.',
+        'Atos administrativos: Conceito; Atributos; Requisitos; Classificação; Extinção.',
+        'Organização administrativa: Órgãos públicos: conceito e classificação; Entidades administrativas: conceito e espécies.',
+        'Agentes públicos: classificação.',
+        'Regime jurídico do militar estadual: Estatuto dos Policiais Militares do Estado da Bahia (Lei Estadual n.º 7.990/01 - arts 1º ao 92).',
+        'Lei Geral de Proteção de Dados Pessoais – LGPD (Lei n.º 13.709/2018 – arts 1º ao 32).'
+    ],
+
+    'Direito Penal': [
+        'Da aplicação da lei penal.',
+        'Lei penal no tempo.',
+        'Lei penal no espaço.',
+        'Do crime: Elementos.',
+        'Consumação e tentativa.',
+        'Desistência voluntária e arrependimento eficaz.',
+        'Arrependimento posterior.',
+        'Crime impossível.',
+        'Causas de exclusão de ilicitude e culpabilidade.',
+        'Dos crimes contra a pessoa (homicídio, feminicídio, lesão corporal, calúnia, difamação e injúria).',
+        'Dos crimes contra a liberdade pessoal (constrangimento ilegal, ameaça, sequestro e cárcere privado).',
+        'Dos crimes contra o patrimônio (furto, roubo, extorsão, apropriação indébita, receptação).',
+        'Dos crimes contra a dignidade sexual (estupro, importunação sexual, assédio sexual, estupro de vulnerável, corrupção de menores).',
+        'Dos crimes contra a paz pública (incitação ao crime, apologia de crime ou criminoso).',
+        'Dos crimes contra a administração pública (peculato e suas formas, concussão, corrupção passiva, prevaricação, condescendência criminosa, resistência, desobediência, desacato, corrupção ativa, contrabando).'
+    ],
+
+    'Direito Processual Penal': [
+        'Princípios do Processo Penal.',
+        'Inquérito Policial.',
+        'Da Prova: conceito, finalidade e obrigatoriedade; do exame de corpo de delito.',
+        'Da Prisão (arts 283 a 309 do CPP).',
+        'Lei das Contravenções Penais (Decreto-Lei n.º 3.688/41).',
+        'Contravenções penais: a prática de atos resultantes de preconceito de raça, de cor, de sexo ou de estado civil (Lei nº 7.437/85).',
+        'Lei nº 13.869/19: Das sanções de natureza civil e administrativa; Dos crimes e das penas.',
+        'Estatuto da Criança e do Adolescente (Lei n.º 8.069/90 – arts. 1º ao 6º; 15 a 18-B; 98 a 130; 225 a 258).',
+        'Lei que define os crimes resultantes de preconceito de raça ou de cor (Lei nº 7.716/89).',
+        'Estatuto da Pessoa com Deficiência (Lei nº 13.146/15 – arts 1º a 13; 88 a 91).',
+        'Crimes de Tortura (Lei n.º 9.455/97).',
+        'Estatuto do Idoso (Lei n.º 10.741/03 – arts 1º ao 10).',
+        'Lei Maria da Penha (Lei n.º 11.340/06).',
+        'Lei que institui o sistema nacional de políticas públicas sobre drogas (Lei n.º 11.343/06 – arts 1º ao 4º, 33 ao 39).'
+    ],
+
+    'Direito Penal Militar': [
+        'Dos crimes militares em tempo de paz.',
+        'Dos crimes contra a autoridade ou disciplina militar: motim, revolta, aliciação e incitamento; violência contra superior ou militar de serviço; desrespeito a superior e a símbolo nacional ou à farda; insubordinação; resistência.',
+        'Dos crimes contra o serviço militar e o dever militar: insubmissão; criação ou simulação de incapacidade física; deserção (arts 187 a 194); abandono de posto; descumprimento de missão; embriaguez em serviço; dormir em serviço.',
+        'Dos crimes contra a Administração Militar: desacato e desobediência.'
+    ],
+
+    'Direito Processual Penal Militar': [
+        'Do Inquérito Policial Militar.',
+        'Da prisão em flagrante.',
+        'Da deserção em geral.',
+        'Do processo de deserção do oficial.',
+        'Do processo de deserção de praça com ou sem graduação e de praça especial.'
+    ]
 }
 
 @app.cli.command('seed-edital')
