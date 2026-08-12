@@ -8,6 +8,8 @@ from datetime import datetime, date, time
 import csv
 import io
 import os
+import unicodedata
+from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -31,7 +33,16 @@ elif database_url.startswith('postgresql://'):
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '').replace('+', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+WHATSAPP_NUMBER = '5575982326077'
+
+def whatsapp_link(message=None):
+    if not WHATSAPP_NUMBER:
+        return ''
+    base = f'https://wa.me/{WHATSAPP_NUMBER}'
+    if message:
+        return f'{base}?text={quote(message)}'
+    return base
+
 db = SQLAlchemy(app)
 
 
@@ -350,8 +361,9 @@ def inject_globals():
     if user:
         level, next_xp = current_level(user.xp)
         return {'current_user': user, 'level': level, 'next_xp': next_xp,
-                'progress': xp_progress(user.xp), 'categories': CATEGORIES, 'plan_name': plan_name(user), 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES}
-    return {'current_user': None, 'categories': CATEGORIES}
+                'progress': xp_progress(user.xp), 'categories': CATEGORIES, 'plan_name': plan_name(user), 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES, 'whatsapp_link': whatsapp_link()}
+    return {'current_user': None, 'categories': CATEGORIES, 'whatsapp_link': whatsapp_link()}
+
 
 @app.route('/')
 def index():
@@ -567,8 +579,7 @@ def request_plan_purchase(plano):
         f'E-mail: {user.email}\n'
         f'Pedido: #{pending.id}'
     )
-    from urllib.parse import quote
-    return redirect(f'https://wa.me/{WHATSAPP_NUMBER}?text={quote(message)}')
+    return redirect(whatsapp_link(message))
 
 @app.route('/admin/pagamentos')
 @admin_required
@@ -807,6 +818,63 @@ def admin_questions():
     return render_template('admin/questions.html', questions=items, categoria=categoria, busca=busca, status=status,
                            materias=materias, conteudos=conteudos, materia_id=materia_id, conteudo_id=conteudo_id)
 
+
+def normalize_question_value(value):
+    """Normaliza texto para comparação de duplicidade sem alterar o texto salvo."""
+    value = str(value or '').replace('\r', ' ').replace('\n', ' ')
+    value = unicodedata.normalize('NFKC', value)
+    value = ' '.join(value.split())
+    return value.casefold().strip()
+
+
+def question_fingerprint(data):
+    """
+    Identidade lógica da questão.
+    Explicação e texto-base ficam fora da assinatura para que a mesma questão
+    continue sendo reconhecida como duplicada mesmo que a explicação varie.
+    """
+    fields = (
+        'categoria', 'banca', 'ano', 'materia_id', 'conteudo_id',
+        'enunciado', 'alternativa_a', 'alternativa_b',
+        'alternativa_c', 'alternativa_d', 'alternativa_e', 'gabarito'
+    )
+    return '||'.join(normalize_question_value(data.get(field)) for field in fields)
+
+
+def existing_question_by_fingerprint(data):
+    """
+    Procura uma questão já cadastrada com a mesma identidade lógica.
+    A busca começa pelos campos que reduzem bastante o conjunto de candidatos.
+    """
+    query = Question.query.filter(
+        Question.categoria == data['categoria'],
+        Question.banca == data['banca'],
+        Question.ano == data['ano'],
+        Question.materia_id == data['materia_id'],
+        Question.conteudo_id == data['conteudo_id'],
+    )
+
+    target = question_fingerprint(data)
+    for item in query.all():
+        candidate = {
+            'categoria': item.categoria,
+            'banca': item.banca,
+            'ano': item.ano,
+            'materia_id': item.materia_id,
+            'conteudo_id': item.conteudo_id,
+            'enunciado': item.enunciado,
+            'alternativa_a': item.alternativa_a,
+            'alternativa_b': item.alternativa_b,
+            'alternativa_c': item.alternativa_c,
+            'alternativa_d': item.alternativa_d,
+            'alternativa_e': item.alternativa_e,
+            'gabarito': item.gabarito,
+        }
+        if question_fingerprint(candidate) == target:
+            return item
+    return None
+
+
 def question_form_data(form):
     categoria = form.get('categoria', '').strip().upper()
     banca = form.get('banca', '').strip()
@@ -967,7 +1035,16 @@ def question_form_data(form):
 def admin_new_question():
     if request.method == 'POST':
         try:
-            q = Question(**question_form_data(request.form)); db.session.add(q); db.session.commit(); flash(f'Questão #{q.id} cadastrada com sucesso.', 'success'); return redirect(url_for('admin_questions'))
+            data = question_form_data(request.form)
+            duplicate = existing_question_by_fingerprint(data)
+            if duplicate:
+                flash(f'Questão duplicada. Ela já está cadastrada como #{duplicate.id}.', 'warning')
+                return redirect(url_for('admin_questions'))
+            q = Question(**data)
+            db.session.add(q)
+            db.session.commit()
+            flash(f'Questão #{q.id} cadastrada com sucesso.', 'success')
+            return redirect(url_for('admin_questions'))
         except ValueError as exc: flash(str(exc), 'danger')
         except Exception as exc:
             db.session.rollback()
@@ -1022,10 +1099,114 @@ def admin_import():
                 flash('CSV inválido. Informe matéria + conteúdo, disciplina + assunto, ou materia_id + conteudo_id.', 'danger'); return redirect(url_for('admin_import'))
             if not reader.fieldnames or not required_base.issubset(set(reader.fieldnames)): flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
             created = 0
-            for row in reader: db.session.add(Question(**question_form_data(row))); created += 1
-            db.session.commit(); flash(f'{created} questão(ões) importada(s) com sucesso.', 'success'); return redirect(url_for('admin_questions'))
+            duplicates = 0
+            batch_fingerprints = set()
+
+            for row in reader:
+                data = question_form_data(row)
+                fingerprint = question_fingerprint(data)
+
+                # Evita duplicação dentro do próprio CSV.
+                if fingerprint in batch_fingerprints:
+                    duplicates += 1
+                    continue
+
+                # Evita duplicação contra o banco existente.
+                if existing_question_by_fingerprint(data):
+                    duplicates += 1
+                    batch_fingerprints.add(fingerprint)
+                    continue
+
+                db.session.add(Question(**data))
+                batch_fingerprints.add(fingerprint)
+                created += 1
+
+            db.session.commit()
+
+            if duplicates:
+                flash(
+                    f'{created} questão(ões) importada(s). '
+                    f'{duplicates} duplicada(s) ignorada(s).',
+                    'success'
+                )
+            else:
+                flash(f'{created} questão(ões) importada(s) com sucesso.', 'success')
+
+            return redirect(url_for('admin_questions'))
         except Exception as exc: db.session.rollback(); flash(f'Falha na importação: {exc}', 'danger')
     return render_template('admin/import.html')
+
+
+@app.route('/admin/questoes/limpar-duplicadas', methods=['POST'])
+@admin_required
+def admin_remove_duplicate_questions():
+    """Remove duplicatas já existentes e preserva a questão de menor ID."""
+    try:
+        questions = Question.query.order_by(Question.id.asc()).all()
+        seen = {}
+        duplicates = []
+
+        for q in questions:
+            data = {
+                'categoria': q.categoria,
+                'banca': q.banca,
+                'ano': q.ano,
+                'materia_id': q.materia_id,
+                'conteudo_id': q.conteudo_id,
+                'enunciado': q.enunciado,
+                'alternativa_a': q.alternativa_a,
+                'alternativa_b': q.alternativa_b,
+                'alternativa_c': q.alternativa_c,
+                'alternativa_d': q.alternativa_d,
+                'alternativa_e': q.alternativa_e,
+                'gabarito': q.gabarito,
+            }
+            fingerprint = question_fingerprint(data)
+
+            if fingerprint in seen:
+                survivor = seen[fingerprint]
+
+                # Preserva histórico: respostas/comentários da duplicata
+                # passam para a questão que será mantida.
+                Answer.query.filter_by(question_id=q.id).update(
+                    {'question_id': survivor.id},
+                    synchronize_session=False
+                )
+                Comment.query.filter_by(question_id=q.id).update(
+                    {'question_id': survivor.id},
+                    synchronize_session=False
+                )
+
+                duplicates.append(q)
+            else:
+                seen[fingerprint] = q
+
+        for q in duplicates:
+            db.session.delete(q)
+
+        db.session.commit()
+        flash(
+            f'Limpeza concluída: {len(duplicates)} duplicata(s) removida(s). '
+            f'Os históricos foram preservados na questão original.',
+            'success'
+        )
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.exception('Erro ao remover duplicatas: %s', exc)
+        flash(f'Falha ao remover duplicatas: {exc}', 'danger')
+
+    return redirect(url_for('admin_questions'))
+
+
+@app.route('/whatsapp')
+def whatsapp():
+    """Abre o WhatsApp configurado no ambiente do sistema."""
+    if not WHATSAPP_NUMBER:
+        flash('O WhatsApp ainda não foi configurado.', 'warning')
+        return redirect(url_for('index'))
+    return redirect(whatsapp_link())
+
+
 
 @app.route('/admin/usuarios')
 @admin_required
