@@ -1164,20 +1164,105 @@ def health():
 
 
 def sync_edital_data():
-    """Garante que matérias e conteúdos do edital existam no banco de produção."""
+    """Sincroniza matérias e conteúdos do edital SD/CFO com o banco de produção."""
+
+    def normalizar(texto):
+        if not texto:
+            return ''
+
+        texto = str(texto).strip()
+
+        # Corrige textos que eventualmente foram gravados com encoding quebrado.
+        try:
+            if 'Ã' in texto or 'Â' in texto:
+                texto = texto.encode('latin1').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            pass
+
+        # Normalização para comparação:
+        # - caixa baixa
+        # - espaços duplicados
+        # - espaços antes/depois de pontuação
+        import unicodedata
+        texto = unicodedata.normalize('NFKC', texto)
+        texto = re.sub(r'\s+', ' ', texto).strip()
+
+        return texto.casefold()
+
     for categoria, dataset in [('SD', SD_EDITAL), ('CFO', CFO_EDITAL)]:
-        for ordem, (nome, conteudos) in enumerate(dataset.items(), 1):
-            materia = Materia.query.filter_by(categoria=categoria, nome=nome).first()
+
+        for ordem, (nome_materia, conteudos) in enumerate(dataset.items(), 1):
+
+            # Primeiro procura pelo nome exato.
+            materia = Materia.query.filter_by(
+                categoria=categoria,
+                nome=nome_materia
+            ).first()
+
+            # Se não encontrou, tenta localizar uma matéria equivalente
+            # usando normalização.
             if not materia:
-                materia = Materia(categoria=categoria, nome=nome, ordem=ordem)
+                alvo = normalizar(nome_materia)
+
+                materias_categoria = Materia.query.filter_by(
+                    categoria=categoria
+                ).all()
+
+                materia = next(
+                    (
+                        m for m in materias_categoria
+                        if normalizar(m.nome) == alvo
+                    ),
+                    None
+                )
+
+            # Se realmente não existir, cria.
+            if not materia:
+                materia = Materia(
+                    categoria=categoria,
+                    nome=nome_materia,
+                    ordem=ordem
+                )
                 db.session.add(materia)
                 db.session.flush()
+
             else:
+                # Garante que o nome oficial do edital seja usado.
+                materia.nome = nome_materia
                 materia.ordem = ordem
+
+            # Carrega os conteúdos atuais dessa matéria.
+            conteudos_existentes = Conteudo.query.filter_by(
+                materia_id=materia.id
+            ).all()
+
             for c_ordem, nome_conteudo in enumerate(conteudos, 1):
-                conteudo = Conteudo.query.filter_by(materia_id=materia.id, nome=nome_conteudo).first()
+
+                alvo = normalizar(nome_conteudo)
+
+                conteudo = next(
+                    (
+                        c for c in conteudos_existentes
+                        if normalizar(c.nome) == alvo
+                    ),
+                    None
+                )
+
                 if not conteudo:
-                    db.session.add(Conteudo(materia_id=materia.id, nome=nome_conteudo, ordem=c_ordem))
+                    conteudo = Conteudo(
+                        materia_id=materia.id,
+                        nome=nome_conteudo,
+                        ordem=c_ordem
+                    )
+                    db.session.add(conteudo)
+                    conteudos_existentes.append(conteudo)
+
+                else:
+                    # Corrige o nome para exatamente o nome oficial
+                    # cadastrado no edital.
+                    conteudo.nome = nome_conteudo
+                    conteudo.ordem = c_ordem
+
     db.session.commit()
 
 
