@@ -1146,68 +1146,12 @@ def seed_edital():
     print(f'Edital carregado: {len(SD_EDITAL)} matérias SD + {len(CFO_EDITAL)} matérias CFO.')
 
 
-def ensure_admin_user():
-    """Garante que o administrador definido nas variáveis de ambiente exista.
-
-    Isso é executado automaticamente no deploy/boot do Render, pois a instância
-    Free não disponibiliza Shell para executar `flask create-admin`.
-    """
-    username = os.environ.get('ADMIN_USERNAME', 'admin').strip()
-    email = os.environ.get('ADMIN_EMAIL', 'admin@pmba.local').strip().lower()
-    telefone = os.environ.get('ADMIN_TELEFONE', '00000000000').strip()
-    password = os.environ.get('ADMIN_PASSWORD', 'admin123')
-
-    if not username or not email or not password:
-        app.logger.warning('ADMIN_USERNAME, ADMIN_EMAIL e ADMIN_PASSWORD devem estar configurados.')
-        return
-
-    existing = User.query.filter(
-        (User.username == username) | (User.email == email)
-    ).first()
-
-    if existing:
-        # Mantém o usuário existente, mas garante acesso administrativo
-        # e sincroniza a senha com ADMIN_PASSWORD do Render.
-        existing.is_admin = True
-        existing.password_hash = generate_password_hash(password)
-
-        # Só altera o telefone se estiver livre ou já pertencer ao próprio usuário.
-        if telefone:
-            phone_owner = User.query.filter(
-                User.telefone == telefone,
-                User.id != existing.id
-            ).first()
-            if not phone_owner:
-                existing.telefone = telefone
-
-        db.session.commit()
-        app.logger.info('Administrador garantido: %s (%s).', existing.username, existing.email)
-        return
-
-    # Evita conflito de telefone com outro usuário.
-    phone_owner = User.query.filter_by(telefone=telefone).first() if telefone else None
-    if phone_owner:
-        app.logger.warning(
-            'ADMIN_TELEFONE já pertence ao usuário %s. O administrador será criado '
-            'sem alterar o telefone existente.', phone_owner.username
-        )
-        telefone = f'admin-{username}-{datetime.utcnow().timestamp()}'
-
-    user = User(
-        username=username,
-        email=email,
-        telefone=telefone,
-        password_hash=generate_password_hash(password),
-        is_admin=True
-    )
-    db.session.add(user)
-    db.session.commit()
-    app.logger.info('Administrador criado automaticamente: %s (%s).', username, email)
-
-
 @app.cli.command('create-admin')
 def create_admin():
-    ensure_admin_user()
+    username = os.environ.get('ADMIN_USERNAME', 'admin'); email = os.environ.get('ADMIN_EMAIL', 'admin@pmba.local'); telefone = os.environ.get('ADMIN_TELEFONE', '00000000000'); password = os.environ.get('ADMIN_PASSWORD', 'admin123')
+    existing = User.query.filter((User.username == username) | (User.email == email)).first()
+    if existing: existing.is_admin = True; db.session.commit(); print(f'Usuário {existing.username} agora é administrador.'); return
+    user = User(username=username, email=email, telefone=telefone, password_hash=generate_password_hash(password), is_admin=True); db.session.add(user); db.session.commit(); print(f'Administrador criado: {username} / senha: {password}')
 
 @app.cli.command('reset-db')
 def reset_db():
@@ -1219,13 +1163,27 @@ def health():
     return jsonify({'status': 'ok'}), 200
 
 
+def sync_edital_data():
+    """Garante que matérias e conteúdos do edital existam no banco de produção."""
+    for categoria, dataset in [('SD', SD_EDITAL), ('CFO', CFO_EDITAL)]:
+        for ordem, (nome, conteudos) in enumerate(dataset.items(), 1):
+            materia = Materia.query.filter_by(categoria=categoria, nome=nome).first()
+            if not materia:
+                materia = Materia(categoria=categoria, nome=nome, ordem=ordem)
+                db.session.add(materia)
+                db.session.flush()
+            else:
+                materia.ordem = ordem
+            for c_ordem, nome_conteudo in enumerate(conteudos, 1):
+                conteudo = Conteudo.query.filter_by(materia_id=materia.id, nome=nome_conteudo).first()
+                if not conteudo:
+                    db.session.add(Conteudo(materia_id=materia.id, nome=nome_conteudo, ordem=c_ordem))
+    db.session.commit()
+
+
 with app.app_context():
     db.create_all()
-    try:
-        ensure_admin_user()
-    except Exception:
-        db.session.rollback()
-        app.logger.exception('Não foi possível garantir o usuário administrador durante a inicialização.')
+    sync_edital_data()
 
 
 if __name__ == '__main__':
