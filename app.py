@@ -137,9 +137,12 @@ LEVELS = [
 ]
 CATEGORIES = [('SD', 'Soldado (SD)'), ('CFO', 'Oficial (CFO)')]
 CATEGORY_VALUES = {'SD', 'CFO'}
-BASE_XP_ACERTO = 3
+# Gamificação — Fase 2
+XP_ACERTO = 15
+XP_ERRO = 3
 BONUS_5_ACERTOS = 20
 BONUS_10_ACERTOS = 50
+BONUS_SIMULADO = 100
 FREE_DAILY_LIMIT = 20
 PLANS = {
     'FREE': 'Gratuito',
@@ -355,6 +358,85 @@ def xp_progress(xp):
     return min(100, round((xp - previous) / (next_xp - previous) * 100))
 
 
+ACHIEVEMENTS = [
+    ('primeira_questao', '🎯 Primeira Questão', 'Respondeu sua primeira questão.'),
+    ('dez_questoes', '📚 Primeiros 10', 'Respondeu 10 questões.'),
+    ('cinquenta_questoes', '🔥 50 Questões', 'Respondeu 50 questões.'),
+    ('cem_questoes', '💪 100 Questões', 'Respondeu 100 questões.'),
+    ('streak_10', '⚡ 10 Acertos Seguidos', 'Conseguiu uma sequência de 10 acertos.'),
+    ('xp_500', '⭐ 500 XP', 'Alcançou 500 XP.'),
+    ('xp_1000', '🏆 1.000 XP', 'Alcançou 1.000 XP.'),
+    ('aproveitamento_80', '🎖️ 80% de Aproveitamento', 'Atingiu pelo menos 80% de aproveitamento em 20 ou mais questões.'),
+]
+
+
+def gamification_summary(user):
+    stats = stats_for_user(user.id)
+    xp = int(user.xp or 0)
+    unlocked = set()
+
+    if stats['total'] >= 1:
+        unlocked.add('primeira_questao')
+    if stats['total'] >= 10:
+        unlocked.add('dez_questoes')
+    if stats['total'] >= 50:
+        unlocked.add('cinquenta_questoes')
+    if stats['total'] >= 100:
+        unlocked.add('cem_questoes')
+    if stats['streak'] >= 10:
+        unlocked.add('streak_10')
+    if xp >= 500:
+        unlocked.add('xp_500')
+    if xp >= 1000:
+        unlocked.add('xp_1000')
+    if stats['total'] >= 20 and stats['aproveitamento'] >= 80:
+        unlocked.add('aproveitamento_80')
+
+    level, next_xp = current_level(xp)
+    previous = next(threshold for name, threshold in LEVELS if name == level)
+    if next_xp == previous:
+        faltam = 0
+    else:
+        faltam = max(0, next_xp - xp)
+
+    return {
+        'xp': xp,
+        'level': level,
+        'next_xp': next_xp,
+        'progress': xp_progress(xp),
+        'faltam': faltam,
+        'stats': stats,
+        'achievements': [
+            {'id': aid, 'nome': nome, 'descricao': desc, 'desbloqueada': aid in unlocked}
+            for aid, nome, desc in ACHIEVEMENTS
+        ],
+    }
+
+
+def xp_for_answer(user, question_id, correta):
+    """Calcula XP apenas para a primeira resposta daquela questão pelo usuário."""
+    ja_respondeu = Answer.query.filter_by(
+        user_id=user.id, question_id=question_id
+    ).first()
+
+    if ja_respondeu:
+        return 0, 0, current_streak(user.id), False
+
+    if correta:
+        streak_before = current_streak(user.id)
+        new_streak = streak_before + 1
+        xp = XP_ACERTO
+        bonus = 0
+        if new_streak % 10 == 0:
+            bonus = BONUS_10_ACERTOS
+        elif new_streak % 5 == 0:
+            bonus = BONUS_5_ACERTOS
+        return xp + bonus, bonus, new_streak, True
+
+    return XP_ERRO, 0, 0, True
+
+
+
 def get_user():
     user_id = session.get('user_id')
     return db.session.get(User, user_id) if user_id else None
@@ -451,8 +533,10 @@ def inject_globals():
     user = get_user()
     if user:
         level, next_xp = current_level(user.xp)
+        gamification = gamification_summary(user)
         return {'current_user': user, 'level': level, 'next_xp': next_xp,
-                'progress': xp_progress(user.xp), 'categories': CATEGORIES, 'plan_name': plan_name(user), 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES, 'whatsapp_link': whatsapp_link()}
+                'progress': xp_progress(user.xp), 'gamification': gamification,
+                'categories': CATEGORIES, 'plan_name': plan_name(user), 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES, 'whatsapp_link': whatsapp_link()}
     return {'current_user': None, 'categories': CATEGORIES, 'whatsapp_link': whatsapp_link()}
 
 
@@ -539,8 +623,17 @@ def dashboard():
         stats=stats,
         daily_count=daily_answer_count(user.id),
         referral_code=user.referral_code,
-        referral_balance=referral_available_balance(user)
+        referral_balance=referral_available_balance(user),
+        gamification=gamification_summary(user)
     )
+
+
+@app.route('/conquistas')
+@login_required
+def achievements():
+    user = get_user()
+    return render_template('achievements.html', gamification=gamification_summary(user), levels=LEVELS)
+
 
 @app.route('/api/materias/<categoria>')
 @login_required
@@ -639,17 +732,8 @@ def question(question_id):
         if resposta not in 'ABCDE':
             flash('Selecione uma alternativa.', 'warning'); return redirect(url_for('question', question_id=q.id))
         correta = resposta == q.gabarito.upper()
-        xp = 0
-        bonus = 0
-        if correta:
-            streak_before = current_streak(user.id)
-            new_streak = streak_before + 1
-            xp = BASE_XP_ACERTO
-            if new_streak % 10 == 0:
-                bonus = BONUS_10_ACERTOS
-            elif new_streak % 5 == 0:
-                bonus = BONUS_5_ACERTOS
-            xp += bonus
+        xp, bonus, _, primeira_resposta = xp_for_answer(user, q.id, correta)
+        if primeira_resposta:
             user.xp += xp
         ans = Answer(user_id=user.id, question_id=q.id, resposta=resposta, correta=correta, xp_ganho=xp)
         db.session.add(ans); db.session.commit(); previous = ans
@@ -884,8 +968,20 @@ def feedback():
 @app.route('/ranking')
 @login_required
 def ranking():
-    users = User.query.order_by(User.xp.desc(), User.username.asc()).all()
-    return render_template('ranking.html', users=users, levels=LEVELS)
+    users = (
+        User.query
+        .filter_by(is_admin=False)
+        .order_by(User.xp.desc(), User.username.asc())
+        .all()
+    )
+    current_user = get_user()
+    position = next((i + 1 for i, u in enumerate(users) if u.id == current_user.id), None)
+    return render_template(
+        'ranking.html',
+        users=users,
+        levels=LEVELS,
+        current_position=position
+    )
 
 # ---------------- RESOLVER / CADERNO / ESTATISTICAS ----------------
 @app.route('/resolver', methods=['GET', 'POST'])
@@ -940,16 +1036,24 @@ def resolver_question():
         resposta = request.form.get('resposta', '').upper()
         if resposta not in 'ABCDE':
             flash('Selecione uma alternativa.', 'warning'); return redirect(url_for('resolver_question'))
-        correta = resposta == q.gabarito.upper(); xp = 0; bonus = 0
+        correta = resposta == q.gabarito.upper()
+        xp, bonus, _, primeira_resposta = xp_for_answer(user, q.id, correta)
         if correta:
-            new_streak = current_streak(user.id) + 1
-            xp = BASE_XP_ACERTO
-            if new_streak % 10 == 0: bonus = BONUS_10_ACERTOS
-            elif new_streak % 5 == 0: bonus = BONUS_5_ACERTOS
-            xp += bonus; user.xp += xp; session['quiz_correct'] = session.get('quiz_correct', 0) + 1
+            session['quiz_correct'] = session.get('quiz_correct', 0) + 1
         else:
             session['quiz_wrong'] = session.get('quiz_wrong', 0) + 1
-        db.session.add(Answer(user_id=user.id, question_id=q.id, resposta=resposta, correta=correta, xp_ganho=xp)); db.session.commit()
+        if primeira_resposta:
+            user.xp += xp
+        db.session.add(
+            Answer(
+                user_id=user.id,
+                question_id=q.id,
+                resposta=resposta,
+                correta=correta,
+                xp_ganho=xp
+            )
+        )
+        db.session.commit()
         session['quiz_xp'] = session.get('quiz_xp', 0) + xp
         result = {'correta': correta, 'resposta': resposta, 'xp': xp, 'bonus': bonus}
     return render_template('resolver_question.html', q=q, index=index, total=len(ids), result=result,
@@ -988,7 +1092,7 @@ def simulado_start():
     ids = [x.id for x in q.order_by(db.func.random()).limit(quantidade).all()]
     if not ids:
         flash('Não há questões suficientes para o simulado.', 'warning'); return redirect(url_for('simulado'))
-    session['quiz_ids'] = ids; session['quiz_index'] = 0; session['quiz_correct'] = 0; session['quiz_wrong'] = 0; session['quiz_xp'] = 0; session['simulado'] = True
+    session['quiz_ids'] = ids; session['quiz_index'] = 0; session['quiz_correct'] = 0; session['quiz_wrong'] = 0; session['quiz_xp'] = 0; session['simulado'] = True; session['simulado_bonus_aplicado'] = False
     return redirect(url_for('resolver_question'))
 
 @app.route('/simulado/finalizar', methods=['POST'])
@@ -1005,13 +1109,14 @@ def quiz_result():
     percent = round(correct / total * 100, 1) if total else 0
     simulated = session.get('simulado', False)
     xp_display = xp
-    if simulated and total:
+    if simulated and total and not session.get('simulado_bonus_aplicado'):
         user = get_user()
-        user.xp += 100
+        user.xp += BONUS_SIMULADO
         db.session.commit()
-        xp_display += 100
+        xp_display += BONUS_SIMULADO
+        session['simulado_bonus_aplicado'] = True
     data = {'total': total, 'correct': correct, 'wrong': wrong, 'percent': percent, 'xp': xp_display, 'simulado': simulated}
-    for key in ['quiz_ids','quiz_index','quiz_correct','quiz_wrong','quiz_xp','quiz_started','simulado']:
+    for key in ['quiz_ids','quiz_index','quiz_correct','quiz_wrong','quiz_xp','quiz_started','simulado','simulado_bonus_aplicado']:
         session.pop(key, None)
     return render_template('quiz_result.html', data=data)
 

@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="tag">GAMIFICAÇÃO</span>
+        <h1>Conquistas</h1>
+        <p>Continue estudando para subir de nível e desbloquear novas conquistas.</p>
+    </div>
+</div>
+
+<div class="card" style="padding:24px;margin-bottom:20px;">
+    <h2>🎖️ {{ gamification.level }}</h2>
+    <div style="display:flex;justify-content:space-between;gap:12px;margin:12px 0 8px;">
+        <strong>{{ gamification.xp }} XP</strong>
+        {% if gamification.faltam > 0 %}
+            <span>{{ gamification.faltam }} XP para o próximo nível</span>
+        {% else %}
+            <span>Nível máximo atual</span>
+        {% endif %}
+    </div>
+    <div style="height:16px;background:#e8edf2;border-radius:999px;overflow:hidden;">
+        <div style="height:100%;width:{{ gamification.progress }}%;background:#d9a928;"></div>
+    </div>
+    <p style="margin-top:10px;">{{ gamification.progress }}% concluído</p>
+</div>
+
+<div class="grid-cards" style="margin-bottom:20px;">
+    <div class="card"><span>Questões</span><strong>{{ gamification.stats.total }}</strong></div>
+    <div class="card"><span>Acertos</span><strong>{{ gamification.stats.acertos }}</strong></div>
+    <div class="card"><span>Aproveitamento</span><strong>{{ gamification.stats.aproveitamento }}%</strong></div>
+    <div class="card"><span>Sequência</span><strong>{{ gamification.stats.streak }}</strong></div>
+</div>
+
+<div class="card" style="padding:24px;">
+    <h2>🏆 Conquistas</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px;">
+        {% for item in gamification.achievements %}
+        <div style="border:1px solid #dfe5eb;border-radius:12px;padding:16px;opacity:{{ '1' if item.desbloqueada else '0.5' }};">
+            <strong style="font-size:18px;">{{ item.nome }}</strong>
+            <p style="margin:8px 0 0;">{{ item.descricao }}</p>
+            <small>{{ 'DESBLOQUEADA ✓' if item.desbloqueada else 'BLOQUEADA' }}</small>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
