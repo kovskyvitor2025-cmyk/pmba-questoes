@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="admin-head">
+    <div>
+        <span class="tag">ADMIN</span>
+        <h1>Indicações e saques</h1>
+        <p>Gerencie as comissões e pagamentos via PIX.</p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:20px;">
+    <div style="padding:20px;">
+        <h2>Saques pendentes</h2>
+        {% set pendentes = withdrawals|selectattr('status', 'equalto', 'PENDENTE')|list %}
+        {% if pendentes %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuário</th>
+                        <th>Valor</th>
+                        <th>PIX</th>
+                        <th>Data</th>
+                        <th>Ação</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in pendentes %}
+                    <tr>
+                        <td>#{{ item.id }}</td>
+                        <td>{{ item.user.username }}</td>
+                        <td>R$ {{ '%.2f'|format(item.valor)|replace('.', ',') }}</td>
+                        <td>{{ item.pix_key }}</td>
+                        <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td style="white-space:nowrap;">
+                            <form method="post" action="{{ url_for('admin_pay_withdrawal', withdrawal_id=item.id) }}" style="display:inline;">
+                                <button class="button" type="submit">✓ Marcar pago</button>
+                            </form>
+                            <form method="post" action="{{ url_for('admin_reject_withdrawal', withdrawal_id=item.id) }}" style="display:inline;">
+                                <button class="button secondary" type="submit">Recusar</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>Nenhum saque pendente.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div style="padding:20px;">
+        <h2>Indicações confirmadas</h2>
+        {% if referrals %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indicador</th>
+                        <th>Indicado</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in referrals %}
+                    <tr>
+                        <td>{{ item.referrer.username }}</td>
+                        <td>{{ item.referred.username }}</td>
+                        <td>R$ {{ '%.2f'|format(item.valor)|replace('.', ',') }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>Nenhuma indicação confirmada ainda.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

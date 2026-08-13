@@ -10,6 +10,9 @@ import csv
 import io
 import os
 import unicodedata
+import secrets
+from decimal import Decimal
+from sqlalchemy import inspect, text as sql_text
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -146,9 +149,9 @@ PLANS = {
 }
 PLAN_PRICES = {
     'FREE': 0.00,
-    'ELITE_SD': 12.90,
-    'ELITE_CFO': 12.90,
-    'ELITE_PRO': 19.90,
+    'ELITE_SD': 24.90,
+    'ELITE_CFO': 24.90,
+    'ELITE_PRO': 24.90,
 }
 PLAN_ACCESS = {
     'FREE': {'SD', 'CFO'},
@@ -167,8 +170,17 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     plano = db.Column(db.String(20), default='FREE', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Programa de indicação
+    referral_code = db.Column(db.String(20), unique=True, nullable=True)
+    referred_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    referral_balance = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+    referral_total_earned = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+    pix_key = db.Column(db.String(160), nullable=True)
+
     answers = db.relationship('Answer', backref='user', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='user', lazy=True, cascade='all, delete-orphan')
+    referrer = db.relationship('User', remote_side=[id], foreign_keys=[referred_by_id], backref='referred_users')
     feedbacks = db.relationship('Feedback', backref='user', lazy=True, cascade='all, delete-orphan')
 
 
@@ -222,6 +234,31 @@ class PaymentRequest(db.Model):
     processed_at = db.Column(db.DateTime, nullable=True)
     user = db.relationship('User', backref=db.backref('payment_requests', lazy=True, cascade='all, delete-orphan'))
 
+class Referral(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    referrer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    referred_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, unique=True)
+    valor = db.Column(db.Numeric(10, 2), nullable=False, default=4.90)
+    status = db.Column(db.String(20), nullable=False, default='CONFIRMADA')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    confirmed_at = db.Column(db.DateTime, nullable=True)
+
+    referrer = db.relationship('User', foreign_keys=[referrer_id], backref=db.backref('referrals_made', lazy=True))
+    referred = db.relationship('User', foreign_keys=[referred_id], backref=db.backref('referral_record', uselist=False))
+
+
+class Withdrawal(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+    pix_key = db.Column(db.String(160), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='PENDENTE')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    processed_at = db.Column(db.DateTime, nullable=True)
+
+    user = db.relationship('User', backref=db.backref('withdrawals', lazy=True, cascade='all, delete-orphan'))
+
+
 class Feedback(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -245,6 +282,59 @@ class Comment(db.Model):
     question_id = db.Column(db.Integer, db.ForeignKey('question.id'), nullable=False)
     texto = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+REFERRAL_REWARD = Decimal('4.90')
+MIN_WITHDRAWAL = Decimal('12.00')
+
+
+def make_referral_code():
+    return secrets.token_hex(4).upper()
+
+
+def ensure_unique_referral_code():
+    """Garante códigos para usuários antigos e novos sem depender de migração externa."""
+    users = User.query.filter((User.referral_code == None) | (User.referral_code == '')).all()
+    used = {u.referral_code for u in User.query.filter(User.referral_code != None).all() if u.referral_code}
+    for user in users:
+        code = make_referral_code()
+        while code in used:
+            code = make_referral_code()
+        user.referral_code = code
+        used.add(code)
+    if users:
+        db.session.commit()
+
+
+def confirm_referral_for_user(user):
+    """Gera R$ 4,90 somente na primeira compra paga confirmada do indicado."""
+    if not user.referred_by_id:
+        return False
+
+    existing = Referral.query.filter_by(referred_id=user.id).first()
+    if existing:
+        return False
+
+    referrer = db.session.get(User, user.referred_by_id)
+    if not referrer or referrer.id == user.id:
+        return False
+
+    referral = Referral(
+        referrer_id=referrer.id,
+        referred_id=user.id,
+        valor=REFERRAL_REWARD,
+        status='CONFIRMADA',
+        confirmed_at=datetime.utcnow()
+    )
+    referrer.referral_balance = (referrer.referral_balance or Decimal('0')) + REFERRAL_REWARD
+    referrer.referral_total_earned = (referrer.referral_total_earned or Decimal('0')) + REFERRAL_REWARD
+    db.session.add(referral)
+    return True
+
+
+def referral_available_balance(user):
+    return Decimal(str(user.referral_balance or 0)).quantize(Decimal('0.01'))
+
 
 
 def current_level(xp):
@@ -374,6 +464,9 @@ def index():
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def register():
+    if request.args.get('ref'):
+        session['referral_code'] = request.args.get('ref', '').strip().upper()
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip().lower()
@@ -390,9 +483,24 @@ def register():
             flash('Este e-mail já está cadastrado.', 'danger'); return render_template('register.html')
         if User.query.filter_by(telefone=telefone).first():
             flash('Este telefone já está cadastrado.', 'danger'); return render_template('register.html')
-        user = User(username=username, email=email, telefone=telefone,
-                    password_hash=generate_password_hash(password))
-        db.session.add(user); db.session.commit()
+        referrer = None
+        referral_code = session.get('referral_code', '').strip().upper()
+        if referral_code:
+            referrer = User.query.filter_by(referral_code=referral_code).first()
+            if referrer and referrer.email == email:
+                referrer = None
+
+        user = User(
+            username=username,
+            email=email,
+            telefone=telefone,
+            password_hash=generate_password_hash(password),
+            referred_by_id=referrer.id if referrer else None,
+            referral_code=make_referral_code()
+        )
+        db.session.add(user)
+        db.session.commit()
+        session.pop('referral_code', None)
         session['user_id'] = user.id
         return redirect(url_for('dashboard'))
     return render_template('register.html')
@@ -422,7 +530,17 @@ def dashboard():
     questoes = Question.query.filter_by(ativo=True).count()
     sd = Question.query.filter_by(ativo=True, categoria='SD').count()
     cfo = Question.query.filter_by(ativo=True, categoria='CFO').count()
-    return render_template('dashboard.html', questoes=questoes, sd=sd, cfo=cfo, levels=LEVELS, stats=stats, daily_count=daily_answer_count(user.id))
+    return render_template(
+        'dashboard.html',
+        questoes=questoes,
+        sd=sd,
+        cfo=cfo,
+        levels=LEVELS,
+        stats=stats,
+        daily_count=daily_answer_count(user.id),
+        referral_code=user.referral_code,
+        referral_balance=referral_available_balance(user)
+    )
 
 @app.route('/api/materias/<categoria>')
 @login_required
@@ -598,8 +716,15 @@ def admin_approve_payment(request_id):
     item.status = 'APROVADO'
     item.processed_at = datetime.utcnow()
     item.user.plano = item.plano
+    ganhou_indicacao = confirm_referral_for_user(item.user)
     db.session.commit()
-    flash(f'Pagamento #{item.id} aprovado. {item.user.username} agora está no {PLANS[item.plano]}.', 'success')
+
+    extra = ' Comissão de indicação de R$ 4,90 liberada.' if ganhou_indicacao else ''
+    flash(
+        f'Pagamento #{item.id} aprovado. {item.user.username} agora está no {PLANS[item.plano]}.'
+        + extra,
+        'success'
+    )
     return redirect(url_for('admin_payments'))
 
 @app.route('/admin/pagamentos/<int:request_id>/recusar', methods=['POST'])
@@ -614,6 +739,122 @@ def admin_reject_payment(request_id):
     db.session.commit()
     flash(f'Pedido #{item.id} marcado como recusado.', 'success')
     return redirect(url_for('admin_payments'))
+
+@app.route('/indicacoes', methods=['GET', 'POST'])
+@login_required
+def referrals():
+    user = get_user()
+
+    if request.method == 'POST':
+        pix_key = request.form.get('pix_key', '').strip()
+        if pix_key:
+            user.pix_key = pix_key
+            db.session.commit()
+            flash('Chave PIX salva.', 'success')
+
+        balance = referral_available_balance(user)
+        pending = Withdrawal.query.filter_by(user_id=user.id, status='PENDENTE').first()
+
+        if balance < MIN_WITHDRAWAL:
+            flash('O saque mínimo é de R$ 12,00.', 'warning')
+        elif pending:
+            flash('Você já possui um saque pendente.', 'warning')
+        elif not user.pix_key:
+            flash('Informe sua chave PIX antes de solicitar o saque.', 'warning')
+        else:
+            withdrawal = Withdrawal(
+                user_id=user.id,
+                valor=balance,
+                pix_key=user.pix_key,
+                status='PENDENTE'
+            )
+            user.referral_balance = Decimal('0.00')
+            db.session.add(withdrawal)
+            db.session.commit()
+            flash(f'Saque de R$ {balance:.2f} solicitado com sucesso.'.replace('.', ','), 'success')
+
+        return redirect(url_for('referrals'))
+
+    referrals_made = (
+        Referral.query
+        .filter_by(referrer_id=user.id)
+        .order_by(Referral.created_at.desc())
+        .all()
+    )
+    withdrawals = (
+        Withdrawal.query
+        .filter_by(user_id=user.id)
+        .order_by(Withdrawal.created_at.desc())
+        .all()
+    )
+    referral_url = url_for('register', ref=user.referral_code, _external=True)
+
+    return render_template(
+        'referrals.html',
+        user=user,
+        referral_url=referral_url,
+        referrals=referrals_made,
+        withdrawals=withdrawals,
+        balance=referral_available_balance(user),
+        reward=REFERRAL_REWARD,
+        minimum=MIN_WITHDRAWAL
+    )
+
+
+@app.route('/admin/indicacoes')
+@admin_required
+def admin_referrals():
+    referrals = Referral.query.order_by(Referral.created_at.desc()).all()
+    withdrawals = Withdrawal.query.order_by(Withdrawal.created_at.desc()).all()
+    return render_template(
+        'admin/referrals.html',
+        referrals=referrals,
+        withdrawals=withdrawals,
+        reward=REFERRAL_REWARD,
+        minimum=MIN_WITHDRAWAL
+    )
+
+
+@app.route('/admin/saques/<int:withdrawal_id>/pagar', methods=['POST'])
+@admin_required
+def admin_pay_withdrawal(withdrawal_id):
+    item = db.session.get(Withdrawal, withdrawal_id)
+    if not item:
+        flash('Saque não encontrado.', 'danger')
+        return redirect(url_for('admin_referrals'))
+
+    if item.status != 'PENDENTE':
+        flash('Este saque já foi processado.', 'warning')
+        return redirect(url_for('admin_referrals'))
+
+    item.status = 'PAGO'
+    item.processed_at = datetime.utcnow()
+    db.session.commit()
+    flash(f'Saque #{item.id} marcado como pago.', 'success')
+    return redirect(url_for('admin_referrals'))
+
+
+@app.route('/admin/saques/<int:withdrawal_id>/recusar', methods=['POST'])
+@admin_required
+def admin_reject_withdrawal(withdrawal_id):
+    item = db.session.get(Withdrawal, withdrawal_id)
+    if not item:
+        flash('Saque não encontrado.', 'danger')
+        return redirect(url_for('admin_referrals'))
+
+    if item.status != 'PENDENTE':
+        flash('Este saque já foi processado.', 'warning')
+        return redirect(url_for('admin_referrals'))
+
+    item.status = 'RECUSADO'
+    item.processed_at = datetime.utcnow()
+    item.user.referral_balance = (
+        referral_available_balance(item.user) + Decimal(str(item.valor))
+    )
+    db.session.commit()
+    flash(f'Saque #{item.id} recusado e valor devolvido ao saldo do usuário.', 'success')
+    return redirect(url_for('admin_referrals'))
+
 
 @app.route('/feedback', methods=['GET', 'POST'])
 @login_required
@@ -1222,58 +1463,10 @@ def admin_import():
     return render_template('admin/import.html')
 
 
-@app.route('/admin/questoes/limpar-duplicadas', methods=['GET', 'POST'])
+@app.route('/admin/questoes/limpar-duplicadas', methods=['POST'])
 @admin_required
 def admin_remove_duplicate_questions():
-    """Lista duplicatas no GET e remove duplicatas somente no POST."""
-
-    # GET = apenas visualizar. Nenhuma questão é alterada.
-    if request.method == 'GET':
-        questions = (
-            Question.query
-            .options(
-                joinedload(Question.materia),
-                joinedload(Question.conteudo)
-            )
-            .order_by(Question.id.asc())
-            .all()
-        )
-
-        seen = {}
-        duplicates = []
-
-        for q in questions:
-            data = {
-                'categoria': q.categoria,
-                'banca': q.banca,
-                'ano': q.ano,
-                'materia_id': q.materia_id,
-                'conteudo_id': q.conteudo_id,
-                'enunciado': q.enunciado,
-                'alternativa_a': q.alternativa_a,
-                'alternativa_b': q.alternativa_b,
-                'alternativa_c': q.alternativa_c,
-                'alternativa_d': q.alternativa_d,
-                'alternativa_e': q.alternativa_e,
-                'gabarito': q.gabarito,
-            }
-            fingerprint = question_fingerprint(data)
-
-            if fingerprint in seen:
-                survivor = seen[fingerprint]
-                duplicates.append({
-                    'original': survivor,
-                    'duplicata': q,
-                })
-            else:
-                seen[fingerprint] = q
-
-        return render_template(
-            'admin/duplicate_questions.html',
-            duplicates=duplicates
-        )
-
-    # POST = única operação que realmente remove duplicatas.
+    """Remove duplicatas já existentes e preserva a questão de menor ID."""
     try:
         questions = Question.query.order_by(Question.id.asc()).all()
         seen = {}
@@ -1831,8 +2024,55 @@ def sync_edital_data():
     db.session.commit()
 
 
+
+def ensure_phase1_schema():
+    """Adiciona as colunas novas ao banco existente sem apagar dados."""
+    inspector = inspect(db.engine)
+    user_columns = {col['name'] for col in inspector.get_columns('user')}
+
+    additions = {
+        'referral_code': 'VARCHAR(20)',
+        'referred_by_id': 'INTEGER',
+        'referral_balance': 'NUMERIC(10, 2)',
+        'referral_total_earned': 'NUMERIC(10, 2)',
+        'pix_key': 'VARCHAR(160)',
+    }
+
+    for name, definition in additions.items():
+        if name not in user_columns:
+            db.session.execute(
+                sql_text(f'ALTER TABLE "user" ADD COLUMN {name} {definition}')
+            )
+
+    db.session.commit()
+
+    # Índice único para os códigos. PostgreSQL e SQLite aceitam IF NOT EXISTS.
+    try:
+        db.session.execute(
+            sql_text(
+                'CREATE UNIQUE INDEX IF NOT EXISTS uq_user_referral_code '
+                'ON "user" (referral_code)'
+            )
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    # Valores padrão para usuários existentes.
+    db.session.execute(
+        sql_text('UPDATE "user" SET referral_balance = 0 WHERE referral_balance IS NULL')
+    )
+    db.session.execute(
+        sql_text('UPDATE "user" SET referral_total_earned = 0 WHERE referral_total_earned IS NULL')
+    )
+    db.session.commit()
+
+
 with app.app_context():
     db.create_all()
+    ensure_phase1_schema()
+    db.create_all()
+    ensure_unique_referral_code()
     sync_edital_data()
 
 

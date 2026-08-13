@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="tag">INDICAÇÕES</span>
+        <h1>Indique e ganhe</h1>
+        <p>Você recebe <strong>R$ {{ '%.2f'|format(reward)|replace('.', ',') }}</strong> por cada indicado que se tornar assinante pagante.</p>
+    </div>
+</div>
+
+<div class="grid-cards">
+    <div class="card">
+        <span>Seu saldo</span>
+        <strong>R$ {{ '%.2f'|format(balance)|replace('.', ',') }}</strong>
+    </div>
+    <div class="card">
+        <span>Indicações confirmadas</span>
+        <strong>{{ referrals|length }}</strong>
+    </div>
+    <div class="card">
+        <span>Saque mínimo</span>
+        <strong>R$ {{ '%.2f'|format(minimum)|replace('.', ',') }}</strong>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div style="padding:20px;">
+        <h2>Seu link de indicação</h2>
+        <p>Envie este link para seus amigos:</p>
+        <input type="text" value="{{ referral_url }}" readonly
+               style="width:100%;padding:12px;border-radius:8px;border:1px solid #ddd;">
+        <p style="margin-top:10px;color:#666;">Código: <strong>{{ user.referral_code }}</strong></p>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div style="padding:20px;">
+        <h2>Solicitar saque</h2>
+        <p>O pagamento é feito manualmente via PIX pelo administrador.</p>
+
+        <form method="post">
+            <label>Chave PIX</label>
+            <input name="pix_key" value="{{ user.pix_key or '' }}" required
+                   placeholder="CPF, telefone, e-mail ou chave aleatória"
+                   style="width:100%;padding:12px;margin:8px 0 16px;border-radius:8px;border:1px solid #ddd;">
+
+            <button class="button" type="submit">
+                Solicitar saque do saldo disponível
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div style="padding:20px;">
+        <h2>Histórico de indicações</h2>
+        {% if referrals %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Indicado</th>
+                        <th>Valor</th>
+                        <th>Status</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in referrals %}
+                    <tr>
+                        <td>{{ item.referred.username }}</td>
+                        <td>R$ {{ '%.2f'|format(item.valor)|replace('.', ',') }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>Você ainda não possui indicações confirmadas.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div style="padding:20px;">
+        <h2>Histórico de saques</h2>
+        {% if withdrawals %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Valor</th>
+                        <th>PIX</th>
+                        <th>Status</th>
+                        <th>Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for item in withdrawals %}
+                    <tr>
+                        <td>R$ {{ '%.2f'|format(item.valor)|replace('.', ',') }}</td>
+                        <td>{{ item.pix_key }}</td>
+                        <td>{{ item.status }}</td>
+                        <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>Nenhum saque solicitado.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
