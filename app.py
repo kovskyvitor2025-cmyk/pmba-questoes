@@ -33,12 +33,7 @@ elif database_url.startswith('postgresql://'):
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,
-    'pool_recycle': 300,
-    'pool_timeout': 30,
-}
-WHATSAPP_NUMBER = '5575982326077'
+WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '').replace('+', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
 
 def whatsapp_link(message=None):
     if not WHATSAPP_NUMBER:
