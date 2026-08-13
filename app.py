@@ -1445,7 +1445,7 @@ def existing_question_by_fingerprint(data):
     return None
 
 
-def question_form_data(form):
+def question_form_data(form, lookup_cache=None):
     categoria = form.get('categoria', '').strip().upper()
     banca = form.get('banca', '').strip()
     ano_raw = form.get('ano', '').strip()
@@ -1494,6 +1494,21 @@ def question_form_data(form):
     # ---------------------------------------------------------
     # LOCALIZA A MATÉRIA
     # ---------------------------------------------------------
+    # No importador em lote, lookup_cache evita uma consulta ao
+    # PostgreSQL para cada linha do CSV.
+    lookup_cache = lookup_cache or {}
+    materia_exact = lookup_cache.get('materia_exact', {})
+    materia_norm = lookup_cache.get('materia_norm', {})
+    conteudo_exact = lookup_cache.get('conteudo_exact', {})
+    conteudo_norm = lookup_cache.get('conteudo_norm', {})
+
+    def _normalizar_edital(valor):
+        import unicodedata
+        valor = str(valor or '').replace('\\r', ' ').replace('\\n', ' ')
+        valor = unicodedata.normalize('NFKC', valor)
+        valor = ' '.join(valor.split())
+        return valor.casefold().strip().rstrip(' .;')
+
     materia_obj = None
 
     if materia_id:
@@ -1503,11 +1518,17 @@ def question_form_data(form):
             materia_obj = None
 
     if not materia_obj and materia_nome:
-        materia_obj = (
-            Materia.query
-            .filter_by(categoria=categoria, nome=materia_nome)
-            .first()
-        )
+        materia_obj = materia_exact.get((categoria, materia_nome))
+        if not materia_obj:
+            materia_obj = materia_norm.get(
+                (categoria, _normalizar_edital(materia_nome))
+            )
+        if not materia_obj and not lookup_cache:
+            materia_obj = (
+                Materia.query
+                .filter_by(categoria=categoria, nome=materia_nome)
+                .first()
+            )
 
     if not materia_obj:
         raise ValueError(
@@ -1533,40 +1554,23 @@ def question_form_data(form):
             conteudo_obj = None
 
     if not conteudo_obj and conteudo_nome:
-        # Primeiro tenta a correspondência exata.
-        conteudo_obj = (
-            Conteudo.query
-            .filter_by(materia_id=materia_obj.id, nome=conteudo_nome)
-            .first()
-        )
+        # Primeiro tenta a correspondência exata usando o cache.
+        conteudo_obj = conteudo_exact.get((materia_obj.id, conteudo_nome))
 
         # Fallback robusto para CSV: ignora diferenças de espaços,
-        # quebras de linha, caixa e espaços Unicode sem alterar o nome
-        # oficial armazenado no edital.
+        # quebras de linha, caixa e pontuação final.
         if not conteudo_obj:
-            import unicodedata
+            conteudo_obj = conteudo_norm.get(
+                (materia_obj.id, _normalizar_edital(conteudo_nome))
+            )
 
-            def _normalizar_edital(valor):
-                valor = str(valor or '').replace('\\r', ' ').replace('\\n', ' ')
-                valor = unicodedata.normalize('NFKC', valor)
-                valor = ' '.join(valor.split())
-                # O edital pode armazenar pontuação final no nome do
-                # conteúdo, enquanto o CSV pode omiti-la.
-                valor = valor.casefold().strip()
-                valor = valor.rstrip(' .;')
-                return valor
-
-            alvo = _normalizar_edital(conteudo_nome)
-            candidatos = Conteudo.query.filter_by(
-                materia_id=materia_obj.id
-            ).all()
-
-            conteudo_obj = next(
-                (
-                    item for item in candidatos
-                    if _normalizar_edital(item.nome) == alvo
-                ),
-                None
+        # Compatibilidade: chamadas fora do importador em lote continuam
+        # podendo consultar o banco.
+        if not conteudo_obj and not lookup_cache:
+            conteudo_obj = (
+                Conteudo.query
+                .filter_by(materia_id=materia_obj.id, nome=conteudo_nome)
+                .first()
             )
 
     if not conteudo_obj:
@@ -1664,6 +1668,8 @@ def admin_import():
             return redirect(url_for('admin_import'))
 
         try:
+            import time
+            import_time_start = time.monotonic()
             content = file.read().decode('utf-8-sig')
             reader = csv.DictReader(io.StringIO(content), delimiter=',')
 
@@ -1693,6 +1699,50 @@ def admin_import():
                 )
                 return redirect(url_for('admin_import'))
 
+            # Pré-carrega matérias, conteúdos e fingerprints existentes UMA vez.
+            # Isso evita dezenas/centenas de round-trips ao Supabase durante um CSV.
+            import unicodedata
+
+            def _norm_import(valor):
+                valor = str(valor or '').replace('\\r', ' ').replace('\\n', ' ')
+                valor = unicodedata.normalize('NFKC', valor)
+                valor = ' '.join(valor.split())
+                return valor.casefold().strip().rstrip(' .;')
+
+            materias_cache = Materia.query.all()
+            conteudos_cache = Conteudo.query.all()
+
+            lookup_cache = {
+                'materia_exact': {(m.categoria, m.nome): m for m in materias_cache},
+                'materia_norm': {(m.categoria, _norm_import(m.nome)): m for m in materias_cache},
+                'conteudo_exact': {(c.materia_id, c.nome): c for c in conteudos_cache},
+                'conteudo_norm': {(c.materia_id, _norm_import(c.nome)): c for c in conteudos_cache},
+            }
+
+            existing_fingerprints = set()
+            for item in Question.query.with_entities(
+                Question.categoria, Question.banca, Question.ano,
+                Question.materia_id, Question.conteudo_id,
+                Question.enunciado, Question.alternativa_a,
+                Question.alternativa_b, Question.alternativa_c,
+                Question.alternativa_d, Question.alternativa_e,
+                Question.gabarito
+            ).all():
+                existing_fingerprints.add(question_fingerprint({
+                    'categoria': item[0],
+                    'banca': item[1],
+                    'ano': item[2],
+                    'materia_id': item[3],
+                    'conteudo_id': item[4],
+                    'enunciado': item[5],
+                    'alternativa_a': item[6],
+                    'alternativa_b': item[7],
+                    'alternativa_c': item[8],
+                    'alternativa_d': item[9],
+                    'alternativa_e': item[10],
+                    'gabarito': item[11],
+                }))
+
             # Primeiro validamos TODO o arquivo.
             # Se houver qualquer erro, nada é gravado no banco.
             valid_rows = []
@@ -1701,7 +1751,7 @@ def admin_import():
 
             for row_number, row in enumerate(reader, start=2):
                 try:
-                    data = question_form_data(row)
+                    data = question_form_data(row, lookup_cache=lookup_cache)
                     fingerprint = question_fingerprint(data)
 
                     # Duplicada dentro do próprio CSV.
@@ -1712,8 +1762,7 @@ def admin_import():
                     batch_fingerprints.add(fingerprint)
 
                     # Duplicada que já existe no banco.
-                    existing = existing_question_by_fingerprint(data)
-                    if existing:
+                    if fingerprint in existing_fingerprints:
                         valid_rows.append(('duplicate', data, fingerprint))
                         continue
 
@@ -1756,6 +1805,11 @@ def admin_import():
                 created += 1
 
             db.session.commit()
+            app.logger.info(
+                'CSV importado: arquivo=%s novas=%s duplicadas=%s tempo=%.2fs',
+                file.filename, created, duplicates,
+                time.monotonic() - import_time_start
+            )
 
             if duplicates:
                 flash(
