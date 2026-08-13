@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from markupsafe import Markup, escape
 import re
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from datetime import datetime, date, time
@@ -33,7 +34,7 @@ elif database_url.startswith('postgresql://'):
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '').replace('+', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+WHATSAPP_NUMBER = '5575982326077'
 
 def whatsapp_link(message=None):
     if not WHATSAPP_NUMBER:
@@ -812,7 +813,19 @@ def admin_questions():
     elif status == 'inativas': q = q.filter_by(ativo=False)
     if busca:
         like = f'%{busca}%'; q = q.filter(db.or_(Question.enunciado.ilike(like), Question.assunto.ilike(like), Question.banca.ilike(like)))
-    items = q.order_by(Question.id.desc()).all()
+    # Carrega matéria/conteúdo junto com as questões para evitar centenas
+    # de consultas lazy durante a renderização da página administrativa.
+    # Também limita a listagem para manter o painel rápido mesmo com milhares
+    # de questões no banco.
+    items = (
+        q.options(
+            joinedload(Question.materia),
+            joinedload(Question.conteudo)
+        )
+        .order_by(Question.id.desc())
+        .limit(100)
+        .all()
+    )
     materias = edital_options(categoria) if categoria in CATEGORY_VALUES else []
     conteudos = Conteudo.query.filter_by(materia_id=int(materia_id)).order_by(Conteudo.ordem).all() if materia_id.isdigit() else []
     return render_template('admin/questions.html', questions=items, categoria=categoria, busca=busca, status=status,
