@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}PMBA Questões — Estude de forma inteligente{% endblock %}
+{% block content %}
+<div class="hero">
+  <div><p class="eyebrow">PREPARAÇÃO PMBA • SD E CFO</p><h1>Estude para a PMBA com estratégia.</h1><p>Resolva questões, descubra seus pontos fortes, identifique suas prioridades e acompanhe sua evolução em um só lugar.</p><div class="quick-links" style="margin-top:22px"><a class="button" href="{{url_for('register')}}">Criar minha conta</a><a class="button secondary" href="{{url_for('login')}}">Já tenho conta</a></div></div>
+</div>
+<div class="grid3">
+  <div class="card"><h2>📝 Banco de questões</h2><p>Questões organizadas por SD/CFO, matéria, conteúdo, banca e ano.</p></div>
+  <div class="card"><h2>📊 Estatísticas</h2><p>Veja acertos, erros, aproveitamento e evolução do seu desempenho.</p></div>
+  <div class="card"><h2>🎯 Estudo direcionado</h2><p>O sistema identifica matérias e conteúdos que precisam da sua atenção.</p></div>
+</div>
+<div class="grid2" style="margin-top:20px">
+  <div class="card"><h2>🟢 Pontos fortes</h2><p>Descubra o que você já domina e mantenha seu nível.</p></div>
+  <div class="card"><h2>🔴 Prioridades</h2><p>Encontre rapidamente os conteúdos com baixo aproveitamento.</p></div>
+</div>
+<div class="card" style="margin-top:20px"><h2>📱 Comunicação</h2><p>Você poderá autorizar o recebimento de questões, alertas de desempenho e notícias importantes pelo WhatsApp.</p><a class="button" href="{{url_for('news')}}">Ver notícias</a></div>
+{% endblock %}

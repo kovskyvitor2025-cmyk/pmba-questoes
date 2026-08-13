@@ -88,23 +88,26 @@
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
     <div class="card" style="padding:24px;">
         <h2>🟢 Pontos fortes</h2>
-        {% if strongest %}
-        <ul>
-        {% for row in strongest %}
-            <li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>
-        {% endfor %}
-        </ul>
-        {% else %}<p>Responda mais questões para identificar seus pontos fortes.</p>{% endif %}
+        <p class="muted">Mínimo de 3 questões e aproveitamento de 70% ou mais.</p>
+        {% if strongest %}<ul>{% for row in strongest %}<li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>{% endfor %}</ul>
+        {% else %}<p>Ainda não há matéria com desempenho forte suficiente.</p>{% endif %}
+    </div>
+    <div class="card" style="padding:24px;">
+        <h2>🟡 Zona de atenção</h2>
+        <p class="muted">Desempenho entre 50% e 69,9%.</p>
+        {% if attention %}<ul>{% for row in attention %}<li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>{% endfor %}</ul>
+        {% else %}<p>Nenhuma matéria nesta faixa.</p>{% endif %}
     </div>
     <div class="card" style="padding:24px;">
         <h2>🔴 Prioridades de estudo</h2>
-        {% if weakest %}
-        <ul>
-        {% for row in weakest %}
-            <li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>
-        {% endfor %}
-        </ul>
-        {% else %}<p>Responda pelo menos 3 questões em uma matéria para gerar uma prioridade.</p>{% endif %}
+        <p class="muted">Mínimo de 3 questões e aproveitamento abaixo de 50%.</p>
+        {% if weakest %}<ul>{% for row in weakest %}<li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>{% endfor %}</ul>
+        {% else %}<p>Nenhuma prioridade crítica identificada.</p>{% endif %}
     </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:20px;">
+    <div class="card" style="padding:24px;"><h2>🟢 Conteúdos dominados</h2>{% if strongest_content %}<ul>{% for row in strongest_content %}<li><strong>{{ row.conteudo }}</strong><br><span class="muted">{{ row.disciplina }} — {{ row.percent }}%</span></li>{% endfor %}</ul>{% else %}<p>Ainda não há conteúdo com 3+ questões e 70%+.</p>{% endif %}</div>
+    <div class="card" style="padding:24px;"><h2>🎯 Conteúdos para revisar</h2>{% if weakest_content %}<ul>{% for row in weakest_content %}<li><strong>{{ row.conteudo }}</strong><br><span class="muted">{{ row.disciplina }} — {{ row.percent }}% ({{ row.total }} questões)</span></li>{% endfor %}</ul>{% else %}<p>Ainda não há conteúdo com 3+ questões abaixo de 50%.</p>{% endif %}</div>
 </div>
 {% endblock %}

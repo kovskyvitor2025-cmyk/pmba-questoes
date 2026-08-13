@@ -14,6 +14,9 @@ import secrets
 from decimal import Decimal
 from sqlalchemy import inspect, text as sql_text
 from urllib.parse import quote
+import json
+import urllib.request
+import urllib.error
 
 app = Flask(__name__)
 
@@ -37,7 +40,10 @@ elif database_url.startswith('postgresql://'):
 app.config['SECRET_KEY'] = secret_key
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-WHATSAPP_NUMBER = '5575982326077'
+WHATSAPP_NUMBER = os.environ.get('WHATSAPP_NUMBER', '5575982326077')
+WHATSAPP_ACCESS_TOKEN = os.environ.get('WHATSAPP_ACCESS_TOKEN', '')
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get('WHATSAPP_PHONE_NUMBER_ID', '')
+WHATSAPP_GRAPH_VERSION = os.environ.get('WHATSAPP_GRAPH_VERSION', 'v23.0')
 
 def whatsapp_link(message=None):
     if not WHATSAPP_NUMBER:
@@ -184,6 +190,12 @@ class User(db.Model):
     referral_total_earned = db.Column(db.Numeric(10, 2), default=0, nullable=False)
     pix_key = db.Column(db.String(160), nullable=True)
 
+    # Preferências de comunicação
+    whatsapp_confirmado = db.Column(db.Boolean, default=False, nullable=False)
+    receber_questoes = db.Column(db.Boolean, default=True, nullable=False)
+    receber_desempenho = db.Column(db.Boolean, default=True, nullable=False)
+    receber_noticias = db.Column(db.Boolean, default=True, nullable=False)
+
     answers = db.relationship('Answer', backref='user', lazy=True, cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='user', lazy=True, cascade='all, delete-orphan')
     referrer = db.relationship('User', remote_side=[id], foreign_keys=[referred_by_id], backref='referred_users')
@@ -272,6 +284,31 @@ class Feedback(db.Model):
     texto = db.Column(db.Text, nullable=False)
     aprovado = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class News(db.Model):
+    __tablename__ = 'news'
+    id = db.Column(db.Integer, primary_key=True)
+    titulo = db.Column(db.String(220), nullable=False)
+    resumo = db.Column(db.Text, nullable=True)
+    url = db.Column(db.String(600), nullable=True)
+    publicada = db.Column(db.Boolean, default=True, nullable=False)
+    enviar_whatsapp = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class MessageLog(db.Model):
+    __tablename__ = 'message_log'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    tipo = db.Column(db.String(40), nullable=False)
+    titulo = db.Column(db.String(220), nullable=True)
+    mensagem = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(30), nullable=False, default='PENDENTE')
+    erro = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    enviado_em = db.Column(db.DateTime, nullable=True)
+    user = db.relationship('User', backref=db.backref('message_logs', lazy=True, cascade='all, delete-orphan'))
+
 
 class Answer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -578,9 +615,7 @@ def inject_globals():
 
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    return redirect(url_for('dashboard'))
+    return render_template('home.html')
 
 @app.route('/cadastro', methods=['GET', 'POST'])
 def register():
@@ -592,6 +627,7 @@ def register():
         email = request.form.get('email', '').strip().lower()
         telefone = request.form.get('telefone', '').strip()
         password = request.form.get('password', '')
+        whatsapp_confirmado = request.form.get('whatsapp_confirmado') == 'on'
         if len(username) < 3 or len(password) < 6 or not email or not telefone:
             flash('Preencha todos os campos. Usuário deve ter 3+ caracteres e senha 6+ caracteres.', 'danger')
             return render_template('register.html')
@@ -616,7 +652,11 @@ def register():
             telefone=telefone,
             password_hash=generate_password_hash(password),
             referred_by_id=referrer.id if referrer else None,
-            referral_code=make_referral_code()
+            referral_code=make_referral_code(),
+            whatsapp_confirmado=whatsapp_confirmado,
+            receber_questoes=whatsapp_confirmado,
+            receber_desempenho=whatsapp_confirmado,
+            receber_noticias=whatsapp_confirmado
         )
         db.session.add(user)
         db.session.commit()
@@ -1253,11 +1293,30 @@ def statistics():
             'percent': round(acertos / total * 100, 1) if total else 0
         })
 
-    strongest = sorted(rows, key=lambda x: (-x['percent'], -x['total']))[:3]
-    weakest = sorted(
-        [r for r in rows if r['total'] >= 3],
-        key=lambda x: (x['percent'], -x['total'])
+    # Classificação coerente: só classificamos após 3 respostas no mesmo recorte.
+    # Forte >= 70%; atenção 50-69,9%; prioridade < 50%.
+    eligible_rows = [r for r in rows if r['total'] >= 3]
+    strongest = sorted(
+        [r for r in eligible_rows if r['percent'] >= 70],
+        key=lambda x: (-x['percent'], -x['total'], x['disciplina'])
     )[:3]
+    attention = sorted(
+        [r for r in eligible_rows if 50 <= r['percent'] < 70],
+        key=lambda x: (-x['percent'], -x['total'], x['disciplina'])
+    )[:3]
+    weakest = sorted(
+        [r for r in eligible_rows if r['percent'] < 50],
+        key=lambda x: (x['percent'], -x['total'], x['disciplina'])
+    )[:3]
+
+    strongest_content = sorted(
+        [r for r in content_rows if r['total'] >= 3 and r['percent'] >= 70],
+        key=lambda x: (-x['percent'], -x['total'], x['conteudo'])
+    )[:3]
+    weakest_content = sorted(
+        [r for r in content_rows if r['total'] >= 3 and r['percent'] < 50],
+        key=lambda x: (x['percent'], -x['total'], x['conteudo'])
+    )[:5]
 
     return render_template(
         'statistics.html',
@@ -1266,7 +1325,10 @@ def statistics():
         content_rows=content_rows,
         evolution=evolution,
         strongest=strongest,
+        attention=attention,
         weakest=weakest,
+        strongest_content=strongest_content,
+        weakest_content=weakest_content,
         plan_days_remaining=plan_days_remaining(user)
     )
 
@@ -1894,6 +1956,170 @@ def admin_remove_duplicate_questions():
     return redirect(url_for('admin_questions'))
 
 
+def normalize_phone(phone):
+    digits = re.sub(r'\D+', '', str(phone or ''))
+    if digits.startswith('00'):
+        digits = digits[2:]
+    if len(digits) in (10, 11):
+        digits = '55' + digits
+    return digits
+
+
+def send_whatsapp_text(user, message, tipo='GERAL', titulo=None):
+    """Envia texto pela WhatsApp Cloud API quando configurada.
+
+    Observação: mensagens proativas fora da janela de 24h normalmente exigem
+    template aprovado pela Meta. Esta função registra sempre o resultado no banco.
+    """
+    log = MessageLog(user_id=user.id, tipo=tipo, titulo=titulo, mensagem=message, status='PENDENTE')
+    db.session.add(log)
+    db.session.commit()
+
+    if not WHATSAPP_ACCESS_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
+        log.status = 'NAO_CONFIGURADO'
+        log.erro = 'WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID não configurados.'
+        db.session.commit()
+        return False, log.erro
+
+    phone = normalize_phone(user.telefone)
+    if not phone:
+        log.status = 'ERRO'
+        log.erro = 'Telefone inválido.'
+        db.session.commit()
+        return False, log.erro
+
+    endpoint = f'https://graph.facebook.com/{WHATSAPP_GRAPH_VERSION}/{WHATSAPP_PHONE_NUMBER_ID}/messages'
+    payload = {
+        'messaging_product': 'whatsapp',
+        'to': phone,
+        'type': 'text',
+        'text': {'preview_url': True, 'body': message}
+    }
+    req = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
+        headers={'Authorization': f'Bearer {WHATSAPP_ACCESS_TOKEN}', 'Content-Type': 'application/json'},
+        method='POST'
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            body = response.read().decode('utf-8', errors='replace')
+            if 200 <= response.status < 300:
+                log.status = 'ENVIADO'
+                log.enviado_em = datetime.utcnow()
+                db.session.commit()
+                return True, body
+            raise RuntimeError(f'HTTP {response.status}: {body}')
+    except Exception as exc:
+        log.status = 'ERRO'
+        log.erro = str(exc)
+        db.session.commit()
+        return False, str(exc)
+
+
+@app.route('/preferencias', methods=['GET', 'POST'])
+@login_required
+def communication_preferences():
+    user = get_user()
+    if request.method == 'POST':
+        telefone = request.form.get('telefone', '').strip()
+        other = User.query.filter(User.telefone == telefone, User.id != user.id).first() if telefone else None
+        if other:
+            flash('Este número de WhatsApp já pertence a outro cadastro.', 'danger')
+            return render_template('preferences.html', user=user)
+        if not telefone:
+            flash('Informe um número de WhatsApp.', 'danger')
+            return render_template('preferences.html', user=user)
+        user.telefone = telefone
+        user.whatsapp_confirmado = request.form.get('whatsapp_confirmado') == 'on'
+        user.receber_questoes = request.form.get('receber_questoes') == 'on'
+        user.receber_desempenho = request.form.get('receber_desempenho') == 'on'
+        user.receber_noticias = request.form.get('receber_noticias') == 'on'
+        db.session.commit()
+        flash('Preferências de comunicação atualizadas.', 'success')
+        return redirect(url_for('communication_preferences'))
+    return render_template('preferences.html', user=user)
+
+
+@app.route('/noticias')
+def news():
+    items = News.query.filter_by(publicada=True).order_by(News.created_at.desc()).all()
+    return render_template('news.html', news=items)
+
+
+@app.route('/admin/noticias')
+@admin_required
+def admin_news():
+    items = News.query.order_by(News.created_at.desc()).all()
+    return render_template('admin/news.html', news=items)
+
+
+@app.route('/admin/noticias/nova', methods=['GET', 'POST'])
+@admin_required
+def admin_new_news():
+    if request.method == 'POST':
+        item = News(
+            titulo=request.form.get('titulo', '').strip(),
+            resumo=request.form.get('resumo', '').strip(),
+            url=request.form.get('url', '').strip() or None,
+            publicada=request.form.get('publicada') == 'on',
+            enviar_whatsapp=request.form.get('enviar_whatsapp') == 'on'
+        )
+        if not item.titulo:
+            flash('Informe o título da notícia.', 'danger')
+            return render_template('admin/news_form.html', item=item)
+        db.session.add(item)
+        db.session.commit()
+        if item.publicada and item.enviar_whatsapp:
+            sent = 0
+            for user in User.query.filter_by(receber_noticias=True, whatsapp_confirmado=True).all():
+                text = f'🔔 PMBA QUESTÕES\n\n{item.titulo}'
+                if item.resumo:
+                    text += f'\n\n{item.resumo}'
+                if item.url:
+                    text += f'\n\nConfira: {item.url}'
+                ok, _ = send_whatsapp_text(user, text, 'NOTICIA', item.titulo)
+                sent += int(ok)
+            flash(f'Notícia publicada. {sent} mensagem(ns) enviada(s).', 'success')
+        else:
+            flash('Notícia salva.', 'success')
+        return redirect(url_for('admin_news'))
+    return render_template('admin/news_form.html', item=None)
+
+
+@app.route('/admin/noticias/<int:news_id>/alternar', methods=['POST'])
+@admin_required
+def admin_toggle_news(news_id):
+    item = db.session.get(News, news_id)
+    if not item:
+        flash('Notícia não encontrada.', 'danger')
+    else:
+        item.publicada = not item.publicada
+        db.session.commit()
+        flash('Status da notícia atualizado.', 'success')
+    return redirect(url_for('admin_news'))
+
+
+@app.route('/admin/mensagens')
+@admin_required
+def admin_messages():
+    logs = MessageLog.query.order_by(MessageLog.created_at.desc()).limit(300).all()
+    return render_template('admin/messages.html', logs=logs)
+
+
+@app.route('/admin/mensagens/teste/<int:user_id>', methods=['POST'])
+@admin_required
+def admin_test_message(user_id):
+    user = db.session.get(User, user_id)
+    if not user:
+        flash('Usuário não encontrado.', 'danger')
+        return redirect(url_for('admin_users'))
+    message = request.form.get('mensagem', '').strip() or '🎯 PMBA QUESTÕES — mensagem de teste do sistema.'
+    ok, detail = send_whatsapp_text(user, message, 'TESTE', 'Teste WhatsApp')
+    flash('Mensagem enviada.' if ok else f'Falha no envio: {detail}', 'success' if ok else 'danger')
+    return redirect(url_for('admin_users'))
+
+
 @app.route('/whatsapp')
 def whatsapp():
     """Abre o WhatsApp configurado no ambiente do sistema."""
@@ -2282,6 +2508,65 @@ def seed_edital():
     print(f'Edital carregado: {len(SD_EDITAL)} matérias SD + {len(CFO_EDITAL)} matérias CFO.')
 
 
+def send_daily_question_campaign():
+    users = User.query.filter_by(whatsapp_confirmado=True, receber_questoes=True).all()
+    question = Question.query.filter_by(ativo=True).order_by(db.func.random()).first()
+    if not question:
+        return 0, 0
+    conteudo = question.conteudo.nome if question.conteudo else (question.assunto or 'Conteúdo geral')
+    sent = failed = 0
+    for user in users:
+        message = (
+            f'🎯 PMBA QUESTÕES\n\nOlá, {user.username}!\n'
+            f'\n📚 {question.disciplina}\n📌 {conteudo}\n\n'
+            'Sua questão de hoje está pronta. Acesse a plataforma para responder e acompanhar seu desempenho.'
+        )
+        ok, _ = send_whatsapp_text(user, message, 'QUESTAO_DIARIA', 'Questão do dia')
+        sent += int(ok); failed += int(not ok)
+    return sent, failed
+
+
+def send_performance_campaign():
+    sent = failed = 0
+    for user in User.query.filter_by(whatsapp_confirmado=True, receber_desempenho=True).all():
+        answers = Answer.query.filter_by(user_id=user.id).all()
+        by_subject = {}
+        for answer in answers:
+            q = answer.question
+            disciplina = (q.disciplina or 'Sem matéria').strip()
+            item = by_subject.setdefault(disciplina, [0, 0])
+            item[0] += 1
+            item[1] += int(answer.correta)
+        weak = []
+        for disciplina, (total, acertos) in by_subject.items():
+            if total >= 3:
+                weak.append((acertos / total * 100, disciplina, total))
+        weak.sort(key=lambda x: (x[0], -x[2]))
+        if not weak or weak[0][0] >= 50:
+            continue
+        percent, disciplina, total = weak[0]
+        message = (
+            f'⚠️ PMBA QUESTÕES\n\n{user.username}, encontramos uma prioridade no seu estudo:\n\n'
+            f'📚 {disciplina}\n📊 {percent:.1f}% de aproveitamento em {total} questões.\n\n'
+            'Vale a pena revisar este conteúdo e resolver novas questões.'
+        )
+        ok, _ = send_whatsapp_text(user, message, 'DESEMPENHO', 'Prioridade de estudo')
+        sent += int(ok); failed += int(not ok)
+    return sent, failed
+
+
+@app.cli.command('send-whatsapp-questoes')
+def cli_send_whatsapp_questions():
+    sent, failed = send_daily_question_campaign()
+    print(f'Questões WhatsApp: {sent} enviadas; {failed} falhas.')
+
+
+@app.cli.command('send-whatsapp-desempenho')
+def cli_send_whatsapp_performance():
+    sent, failed = send_performance_campaign()
+    print(f'Desempenho WhatsApp: {sent} enviados; {failed} falhas.')
+
+
 @app.cli.command('create-admin')
 def create_admin():
     username = os.environ.get('ADMIN_USERNAME', 'admin'); email = os.environ.get('ADMIN_EMAIL', 'admin@pmba.local'); telefone = os.environ.get('ADMIN_TELEFONE', '00000000000'); password = os.environ.get('ADMIN_PASSWORD', 'admin123')
@@ -2416,6 +2701,10 @@ def ensure_phase1_schema():
         'pix_key': 'VARCHAR(160)',
         'plan_started_at': 'TIMESTAMP NULL',
         'plan_expires_at': 'TIMESTAMP NULL',
+        'whatsapp_confirmado': 'BOOLEAN DEFAULT FALSE',
+        'receber_questoes': 'BOOLEAN DEFAULT TRUE',
+        'receber_desempenho': 'BOOLEAN DEFAULT TRUE',
+        'receber_noticias': 'BOOLEAN DEFAULT TRUE',
     }
 
     for name, definition in additions.items():
