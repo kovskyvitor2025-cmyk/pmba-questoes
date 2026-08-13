@@ -154,7 +154,7 @@ PLAN_PRICES = {
     'FREE': 0.00,
     'ELITE_SD': 24.90,
     'ELITE_CFO': 24.90,
-    'ELITE_PRO': 24.90,
+    'ELITE_PRO': 39.90,
 }
 PLAN_ACCESS = {
     'FREE': {'SD', 'CFO'},
@@ -1001,7 +1001,7 @@ def resolver():
         if materia_id.isdigit(): q = q.filter_by(materia_id=int(materia_id))
         if conteudo_id.isdigit(): q = q.filter_by(conteudo_id=int(conteudo_id))
         if banca: q = q.filter_by(banca=banca)
-        ids = [x.id for x in q.order_by(db.func.random()).limit(quantidade).all()]
+        ids = select_question_ids_for_user(q, user.id, quantidade)
         if not ids:
             flash('Não há questões para os filtros escolhidos.', 'warning'); return redirect(url_for('resolver'))
         session['quiz_ids'] = ids; session['quiz_index'] = 0; session['quiz_correct'] = 0; session['quiz_wrong'] = 0; session['quiz_xp'] = 0; session['quiz_started'] = datetime.utcnow().isoformat()
@@ -1089,7 +1089,7 @@ def simulado_start():
     if categorias:
         categorias = [c for c in categorias if c in CATEGORY_VALUES]
         if categorias: q = q.filter(Question.categoria.in_(categorias))
-    ids = [x.id for x in q.order_by(db.func.random()).limit(quantidade).all()]
+    ids = select_question_ids_for_user(q, user.id, quantidade)
     if not ids:
         flash('Não há questões suficientes para o simulado.', 'warning'); return redirect(url_for('simulado'))
     session['quiz_ids'] = ids; session['quiz_index'] = 0; session['quiz_correct'] = 0; session['quiz_wrong'] = 0; session['quiz_xp'] = 0; session['simulado'] = True; session['simulado_bonus_aplicado'] = False
@@ -1198,6 +1198,84 @@ def question_fingerprint(data):
         'alternativa_c', 'alternativa_d', 'alternativa_e', 'gabarito'
     )
     return '||'.join(normalize_question_value(data.get(field)) for field in fields)
+
+
+
+def select_question_ids_for_user(query, user_id, quantity):
+    """
+    Seleciona questões respeitando a fila individual do usuário.
+
+    Prioridade:
+      1. Nunca respondidas pelo usuário.
+      2. Respondidas e erradas, priorizando as mais antigas.
+      3. Respondidas e acertadas, priorizando as mais antigas.
+
+    Dentro de cada grupo, a ordem é por ID crescente para as inéditas e pela
+    última resposta mais antiga para as já respondidas. Assim, uma questão
+    respondida sai da frente da fila sem ser apagada do banco.
+    """
+    quantity = max(1, int(quantity or 1))
+
+    candidate_ids = [
+        row[0]
+        for row in query.with_entities(Question.id).order_by(Question.id.asc()).all()
+    ]
+    if not candidate_ids:
+        return []
+
+    latest_answer_subquery = (
+        db.session.query(
+            Answer.question_id.label('question_id'),
+            db.func.max(Answer.id).label('latest_answer_id')
+        )
+        .filter(
+            Answer.user_id == user_id,
+            Answer.question_id.in_(candidate_ids)
+        )
+        .group_by(Answer.question_id)
+        .subquery()
+    )
+
+    latest_answers = (
+        db.session.query(Answer)
+        .join(
+            latest_answer_subquery,
+            Answer.id == latest_answer_subquery.c.latest_answer_id
+        )
+        .all()
+    )
+
+    history = {
+        answer.question_id: answer
+        for answer in latest_answers
+    }
+
+    unanswered = []
+    wrong = []
+    correct = []
+
+    for question_id in candidate_ids:
+        answer = history.get(question_id)
+        if answer is None:
+            unanswered.append(question_id)
+        elif not answer.correta:
+            wrong.append((answer.created_at or datetime.min, question_id))
+        else:
+            correct.append((answer.created_at or datetime.min, question_id))
+
+    # Mais antigas primeiro: a questão respondida há mais tempo volta antes.
+    wrong.sort(key=lambda item: (item[0], item[1]))
+    correct.sort(key=lambda item: (item[0], item[1]))
+
+    ordered = (
+        unanswered
+        + [question_id for _, question_id in wrong]
+        + [question_id for _, question_id in correct]
+    )
+
+    # Evita repetir dentro da própria sessão mesmo que o banco tenha histórico
+    # antigo inconsistente.
+    return ordered[:quantity]
 
 
 def existing_question_by_fingerprint(data):
