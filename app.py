@@ -1101,37 +1101,101 @@ def admin_delete_question(question_id):
 def admin_import():
     if request.method == 'POST':
         file = request.files.get('arquivo')
-        if not file or not file.filename.lower().endswith('.csv'): flash('Envie um arquivo CSV.', 'danger'); return redirect(url_for('admin_import'))
+
+        if not file or not file.filename.lower().endswith('.csv'):
+            flash('Envie um arquivo CSV.', 'danger')
+            return redirect(url_for('admin_import'))
+
         try:
-            content = file.read().decode('utf-8-sig'); reader = csv.DictReader(io.StringIO(content), delimiter=',')
-            required_base = {'categoria','banca','ano','texto_base','enunciado','alternativa_a','alternativa_b','alternativa_c','alternativa_d','alternativa_e','gabarito','explicacao'}
-            required_location = ({'materia','conteudo'}, {'disciplina','assunto'}, {'materia_id','conteudo_id'})
-            if not reader.fieldnames or not required_base.issubset(set(reader.fieldnames)):
-                flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
-            if not any(pair.issubset(set(reader.fieldnames)) for pair in required_location):
-                flash('CSV inválido. Informe matéria + conteúdo, disciplina + assunto, ou materia_id + conteudo_id.', 'danger'); return redirect(url_for('admin_import'))
-            if not reader.fieldnames or not required_base.issubset(set(reader.fieldnames)): flash('CSV inválido. Use o modelo disponível nesta página.', 'danger'); return redirect(url_for('admin_import'))
-            created = 0
-            duplicates = 0
+            content = file.read().decode('utf-8-sig')
+            reader = csv.DictReader(io.StringIO(content), delimiter=',')
+
+            required_base = {
+                'categoria', 'banca', 'ano', 'texto_base', 'enunciado',
+                'alternativa_a', 'alternativa_b', 'alternativa_c',
+                'alternativa_d', 'alternativa_e', 'gabarito', 'explicacao'
+            }
+
+            required_location = (
+                {'materia', 'conteudo'},
+                {'disciplina', 'assunto'},
+                {'materia_id', 'conteudo_id'}
+            )
+
+            fieldnames = set(reader.fieldnames or [])
+
+            if not reader.fieldnames or not required_base.issubset(fieldnames):
+                flash('CSV inválido. Use o modelo disponível nesta página.', 'danger')
+                return redirect(url_for('admin_import'))
+
+            if not any(pair.issubset(fieldnames) for pair in required_location):
+                flash(
+                    'CSV inválido. Informe matéria + conteúdo, disciplina + assunto, '
+                    'ou materia_id + conteudo_id.',
+                    'danger'
+                )
+                return redirect(url_for('admin_import'))
+
+            # Primeiro validamos TODO o arquivo.
+            # Se houver qualquer erro, nada é gravado no banco.
+            valid_rows = []
+            errors = []
             batch_fingerprints = set()
 
-            for row in reader:
-                data = question_form_data(row)
-                fingerprint = question_fingerprint(data)
+            for row_number, row in enumerate(reader, start=2):
+                try:
+                    data = question_form_data(row)
+                    fingerprint = question_fingerprint(data)
 
-                # Evita duplicação dentro do próprio CSV.
-                if fingerprint in batch_fingerprints:
-                    duplicates += 1
-                    continue
+                    # Duplicada dentro do próprio CSV.
+                    if fingerprint in batch_fingerprints:
+                        valid_rows.append(('duplicate', data, fingerprint))
+                        continue
 
-                # Evita duplicação contra o banco existente.
-                if existing_question_by_fingerprint(data):
-                    duplicates += 1
                     batch_fingerprints.add(fingerprint)
+
+                    # Duplicada que já existe no banco.
+                    existing = existing_question_by_fingerprint(data)
+                    if existing:
+                        valid_rows.append(('duplicate', data, fingerprint))
+                        continue
+
+                    valid_rows.append(('new', data, fingerprint))
+
+                except Exception as exc:
+                    # Mostra a linha do CSV e o erro específico.
+                    errors.append(
+                        f'Linha {row_number}: {exc}'
+                    )
+
+            # IMPORTANTE:
+            # Se existirem erros, não importa nenhuma questão deste arquivo.
+            if errors:
+                db.session.rollback()
+
+                mensagem = (
+                    f'Falha na importação: foram encontrados {len(errors)} erro(s). '
+                    f'Nenhuma questão foi importada.'
+                )
+                flash(mensagem, 'danger')
+
+                # Cada erro é enviado separadamente para ficar legível
+                # mesmo quando o CSV possui vários problemas.
+                for error in errors:
+                    flash(error, 'danger')
+
+                return redirect(url_for('admin_import'))
+
+            created = 0
+            duplicates = 0
+
+            # Só chegamos aqui quando o CSV inteiro passou na validação.
+            for status_row, data, fingerprint in valid_rows:
+                if status_row == 'duplicate':
+                    duplicates += 1
                     continue
 
                 db.session.add(Question(**data))
-                batch_fingerprints.add(fingerprint)
                 created += 1
 
             db.session.commit()
@@ -1143,10 +1207,18 @@ def admin_import():
                     'success'
                 )
             else:
-                flash(f'{created} questão(ões) importada(s) com sucesso.', 'success')
+                flash(
+                    f'{created} questão(ões) importada(s) com sucesso.',
+                    'success'
+                )
 
             return redirect(url_for('admin_questions'))
-        except Exception as exc: db.session.rollback(); flash(f'Falha na importação: {exc}', 'danger')
+
+        except Exception as exc:
+            db.session.rollback()
+            app.logger.exception('Erro na importação CSV: %s', exc)
+            flash(f'Falha na importação: {exc}', 'danger')
+
     return render_template('admin/import.html')
 
 
