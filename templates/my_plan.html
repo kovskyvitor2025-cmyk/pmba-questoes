@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="tag">ASSINATURA</span>
+        <h1>Meu plano</h1>
+        <p>Confira a vigência atual da sua assinatura.</p>
+    </div>
+</div>
+
+<div class="card" style="padding:24px;max-width:760px;">
+    <h2>{{ plan_name }}</h2>
+    {% if user.plano == 'FREE' %}
+        <p>Você está no plano gratuito.</p>
+        <p>O plano gratuito possui limite diário de questões.</p>
+        <a class="button" href="{{ url_for('plans') }}">Ver planos</a>
+    {% else %}
+        <div class="grid-cards" style="margin:20px 0;">
+            <div class="card"><span>Início</span><strong>{{ plan_started_at.strftime('%d/%m/%Y') if plan_started_at else '-' }}</strong></div>
+            <div class="card"><span>Vencimento</span><strong>{{ plan_expires_at.strftime('%d/%m/%Y') if plan_expires_at else '-' }}</strong></div>
+            <div class="card"><span>Dias restantes</span><strong>{{ plan_days_remaining }}</strong></div>
+        </div>
+        <p>Seu plano é válido por {{ plan_duration }} dias. Ao renovar o mesmo plano antes do vencimento, os novos 30 dias são somados ao período atual.</p>
+        <a class="button" href="{{ url_for('plans') }}">Renovar / ver planos</a>
+    {% endif %}
+</div>
+{% endblock %}

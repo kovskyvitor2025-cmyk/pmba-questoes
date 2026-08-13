@@ -1,1 +1,110 @@
-{% extends 'base.html' %}{% block content %}<div class="page-head"><span class="tag">DESEMPENHO</span><h1>Minhas estatísticas</h1></div><div class="grid3"><div class="stat"><b>{{stats.total}}</b><span>Respondidas</span></div><div class="stat"><b>{{stats.acertos}}</b><span>Acertos</span></div><div class="stat"><b>{{stats.aproveitamento}}%</b><span>Aproveitamento</span></div></div><div class="grid3"><div class="stat"><b>{{stats.erros}}</b><span>Erros</span></div><div class="stat"><b>{{stats.streak}}</b><span>Sequência atual</span></div><div class="stat"><b>{{current_user.xp}} XP</b><span>XP total</span></div></div><div class="card"><h2>Desempenho por disciplina</h2><table><thead><tr><th>Disciplina</th><th>Respondidas</th><th>Acertos</th><th>Erros</th><th>%</th></tr></thead><tbody>{% for row in rows %}<tr><td>{{row.disciplina}}</td><td>{{row.total}}</td><td>{{row.acertos}}</td><td>{{row.erros}}</td><td><b>{{row.percent}}%</b></td></tr>{% else %}<tr><td colspan="5">Ainda não há respostas.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <span class="tag">DESEMPENHO</span>
+        <h1>Minhas estatísticas</h1>
+        <p>Veja onde você está forte, onde está errando e se seu desempenho está evoluindo.</p>
+    </div>
+</div>
+
+<div class="grid-cards" style="margin-bottom:20px;">
+    <div class="card"><span>Questões</span><strong>{{ stats.total }}</strong></div>
+    <div class="card"><span>Acertos</span><strong>{{ stats.acertos }}</strong></div>
+    <div class="card"><span>Erros</span><strong>{{ stats.erros }}</strong></div>
+    <div class="card"><span>Aproveitamento</span><strong>{{ stats.aproveitamento }}%</strong></div>
+</div>
+
+<div class="card" style="padding:24px;margin-bottom:20px;">
+    <h2>📈 Evolução</h2>
+    {% if evolution %}
+    <div class="table-wrap" style="margin-top:14px;">
+        <table>
+            <thead><tr><th>Bloco</th><th>Questões</th><th>Acertos</th><th>Aproveitamento</th></tr></thead>
+            <tbody>
+            {% for row in evolution %}
+            <tr>
+                <td>{{ row.bloco }}</td><td>{{ row.total }}</td><td>{{ row.acertos }}</td><td>{{ row.percent }}%</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Responda algumas questões para começar a acompanhar sua evolução.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="padding:24px;margin-bottom:20px;">
+    <h2>📚 Desempenho por matéria</h2>
+    {% if rows %}
+    <div class="table-wrap" style="margin-top:14px;">
+        <table>
+            <thead><tr><th>Matéria</th><th>Questões</th><th>Acertos</th><th>Erros</th><th>Aproveitamento</th></tr></thead>
+            <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.disciplina }}</td>
+                <td>{{ row.total }}</td>
+                <td>{{ row.acertos }}</td>
+                <td>{{ row.erros }}</td>
+                <td><strong>{{ row.percent }}%</strong></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Você ainda não respondeu questões.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="padding:24px;margin-bottom:20px;">
+    <h2>🎯 Conteúdos</h2>
+    <p>Os conteúdos com menor aproveitamento merecem prioridade na revisão.</p>
+    {% if content_rows %}
+    <div class="table-wrap" style="margin-top:14px;">
+        <table>
+            <thead><tr><th>Matéria</th><th>Conteúdo</th><th>Questões</th><th>Acertos</th><th>Aproveitamento</th></tr></thead>
+            <tbody>
+            {% for row in content_rows %}
+            <tr>
+                <td>{{ row.disciplina }}</td>
+                <td>{{ row.conteudo }}</td>
+                <td>{{ row.total }}</td>
+                <td>{{ row.acertos }}</td>
+                <td><strong>{{ row.percent }}%</strong></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Ainda não há dados suficientes por conteúdo.</p>
+    {% endif %}
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+    <div class="card" style="padding:24px;">
+        <h2>🟢 Pontos fortes</h2>
+        {% if strongest %}
+        <ul>
+        {% for row in strongest %}
+            <li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>
+        {% endfor %}
+        </ul>
+        {% else %}<p>Responda mais questões para identificar seus pontos fortes.</p>{% endif %}
+    </div>
+    <div class="card" style="padding:24px;">
+        <h2>🔴 Prioridades de estudo</h2>
+        {% if weakest %}
+        <ul>
+        {% for row in weakest %}
+            <li><strong>{{ row.disciplina }}</strong> — {{ row.percent }}% ({{ row.total }} questões)</li>
+        {% endfor %}
+        </ul>
+        {% else %}<p>Responda pelo menos 3 questões em uma matéria para gerar uma prioridade.</p>{% endif %}
+    </div>
+</div>
+{% endblock %}

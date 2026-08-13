@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import joinedload
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 import csv
 import io
 import os
@@ -144,6 +144,7 @@ BONUS_5_ACERTOS = 20
 BONUS_10_ACERTOS = 50
 BONUS_SIMULADO = 100
 FREE_DAILY_LIMIT = 20
+PLAN_DURATION_DAYS = 30
 PLANS = {
     'FREE': 'Gratuito',
     'ELITE_SD': 'Elite SD',
@@ -172,6 +173,8 @@ class User(db.Model):
     xp = db.Column(db.Integer, default=0, nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     plano = db.Column(db.String(20), default='FREE', nullable=False)
+    plan_started_at = db.Column(db.DateTime, nullable=True)
+    plan_expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Programa de indicação
@@ -439,21 +442,54 @@ def xp_for_answer(user, question_id, correta):
 
 def get_user():
     user_id = session.get('user_id')
-    return db.session.get(User, user_id) if user_id else None
+    if not user_id:
+        return None
+    user = db.session.get(User, user_id)
+    if user:
+        refresh_plan_status(user)
+    return user
+
+def plan_is_expired(user):
+    return (
+        user.plano != 'FREE'
+        and user.plan_expires_at is not None
+        and user.plan_expires_at <= datetime.utcnow()
+    )
+
+def refresh_plan_status(user, commit=True):
+    """Expira planos pagos automaticamente quando os 30 dias terminarem."""
+    if user and plan_is_expired(user):
+        user.plano = 'FREE'
+        user.plan_started_at = None
+        user.plan_expires_at = None
+        if commit:
+            db.session.commit()
+        return True
+    return False
 
 def plan_name(user):
+    refresh_plan_status(user)
     return PLANS.get(user.plano, PLANS['FREE'])
+
+def plan_days_remaining(user):
+    refresh_plan_status(user)
+    if user.plano == 'FREE' or not user.plan_expires_at:
+        return None
+    seconds = (user.plan_expires_at - datetime.utcnow()).total_seconds()
+    return max(0, int((seconds + 86399) // 86400))
 
 def daily_answer_count(user_id):
     start = datetime.combine(date.today(), time.min)
     return Answer.query.filter(Answer.user_id == user_id, Answer.created_at >= start).count()
 
 def daily_remaining(user):
+    refresh_plan_status(user)
     if user.plano != 'FREE':
         return None
     return max(0, FREE_DAILY_LIMIT - daily_answer_count(user.id))
 
 def can_access_category(user, categoria):
+    refresh_plan_status(user)
     return categoria in PLAN_ACCESS.get(user.plano, PLAN_ACCESS['FREE'])
 
 def enforce_question_access(user, categoria=None):
@@ -536,7 +572,7 @@ def inject_globals():
         gamification = gamification_summary(user)
         return {'current_user': user, 'level': level, 'next_xp': next_xp,
                 'progress': xp_progress(user.xp), 'gamification': gamification,
-                'categories': CATEGORIES, 'plan_name': plan_name(user), 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES, 'whatsapp_link': whatsapp_link()}
+                'categories': CATEGORIES, 'plan_name': plan_name(user), 'plan_days_remaining': plan_days_remaining(user), 'plan_expires_at': user.plan_expires_at, 'daily_remaining': daily_remaining(user), 'plans': PLANS, 'plan_prices': PLAN_PRICES, 'whatsapp_link': whatsapp_link()}
     return {'current_user': None, 'categories': CATEGORIES, 'whatsapp_link': whatsapp_link()}
 
 
@@ -763,9 +799,9 @@ def request_plan_purchase(plano):
     if plano not in ('ELITE_SD', 'ELITE_CFO', 'ELITE_PRO'):
         flash('Plano inválido.', 'danger')
         return redirect(url_for('plans'))
-    if user.plano == plano:
-        flash('Você já está neste plano.', 'info')
-        return redirect(url_for('plans'))
+    refresh_plan_status(user)
+    if user.plano == plano and user.plan_expires_at:
+        flash('Você já possui este plano ativo. Uma nova compra pode ser usada para renovar por mais 30 dias.', 'info')
     # Evita criar vários pedidos pendentes iguais para o mesmo usuário.
     pending = PaymentRequest.query.filter_by(user_id=user.id, plano=plano, status='PENDENTE').first()
     if not pending:
@@ -797,15 +833,32 @@ def admin_approve_payment(request_id):
     if not item:
         flash('Pedido não encontrado.', 'danger')
         return redirect(url_for('admin_payments'))
+    now = datetime.utcnow()
+    user = item.user
+    refresh_plan_status(user, commit=False)
+
     item.status = 'APROVADO'
-    item.processed_at = datetime.utcnow()
-    item.user.plano = item.plano
-    ganhou_indicacao = confirm_referral_for_user(item.user)
+    item.processed_at = now
+
+    # Renovação do mesmo plano: soma 30 dias ao vencimento atual.
+    # Novo plano ou plano expirado: começa uma nova vigência de 30 dias.
+    if user.plano == item.plano and user.plan_expires_at and user.plan_expires_at > now:
+        inicio = user.plan_expires_at
+        vencimento = user.plan_expires_at + timedelta(days=PLAN_DURATION_DAYS)
+    else:
+        inicio = now
+        vencimento = now + timedelta(days=PLAN_DURATION_DAYS)
+
+    user.plano = item.plano
+    user.plan_started_at = inicio
+    user.plan_expires_at = vencimento
+
+    ganhou_indicacao = confirm_referral_for_user(user)
     db.session.commit()
 
     extra = ' Comissão de indicação de R$ 4,90 liberada.' if ganhou_indicacao else ''
     flash(
-        f'Pagamento #{item.id} aprovado. {item.user.username} agora está no {PLANS[item.plano]}.'
+        f'Pagamento #{item.id} aprovado. {user.username} agora está no {PLANS[item.plano]} por 30 dias.'
         + extra,
         'success'
     )
@@ -1126,16 +1179,96 @@ def error_notebook():
     items = latest_wrong_questions(session['user_id'])
     return render_template('error_notebook.html', questions=items)
 
+@app.route('/meu-plano')
+@login_required
+def my_plan():
+    user = get_user()
+    return render_template(
+        'my_plan.html',
+        user=user,
+        plan_name=plan_name(user),
+        plan_days_remaining=plan_days_remaining(user),
+        plan_expires_at=user.plan_expires_at,
+        plan_started_at=user.plan_started_at,
+        plan_duration=PLAN_DURATION_DAYS
+    )
+
 @app.route('/estatisticas')
 @login_required
 def statistics():
-    user = get_user(); stats = stats_for_user(user.id)
+    user = get_user()
+    stats = stats_for_user(user.id)
+
+    answers = (
+        Answer.query
+        .options(joinedload(Answer.question).joinedload(Question.conteudo))
+        .join(Question)
+        .filter(Answer.user_id == user.id)
+        .order_by(Answer.created_at.asc(), Answer.id.asc())
+        .all()
+    )
+
+    # Desempenho por matéria/disciplina.
+    by_subject = {}
+    # Desempenho por conteúdo/assunto.
+    by_content = {}
+
+    for answer in answers:
+        q = answer.question
+        disciplina = (q.disciplina or 'Sem matéria').strip()
+        item = by_subject.setdefault(disciplina, {'disciplina': disciplina, 'total': 0, 'acertos': 0})
+        item['total'] += 1
+        item['acertos'] += 1 if answer.correta else 0
+
+        conteudo = q.conteudo.nome if q.conteudo else (q.assunto or 'Sem conteúdo')
+        ckey = (disciplina, conteudo)
+        citem = by_content.setdefault(ckey, {'disciplina': disciplina, 'conteudo': conteudo, 'total': 0, 'acertos': 0})
+        citem['total'] += 1
+        citem['acertos'] += 1 if answer.correta else 0
+
     rows = []
-    for disciplina, in db.session.query(Question.disciplina).distinct().order_by(Question.disciplina).all():
-        ans = Answer.query.join(Question).filter(Answer.user_id == user.id, Question.disciplina == disciplina).all()
-        total = len(ans); acertos = sum(a.correta for a in ans)
-        rows.append({'disciplina': disciplina, 'total': total, 'acertos': acertos, 'erros': total-acertos, 'percent': round(acertos/total*100,1) if total else 0})
-    return render_template('statistics.html', stats=stats, rows=rows)
+    for item in by_subject.values():
+        item['erros'] = item['total'] - item['acertos']
+        item['percent'] = round(item['acertos'] / item['total'] * 100, 1) if item['total'] else 0
+        rows.append(item)
+    rows.sort(key=lambda x: (-x['total'], x['disciplina']))
+
+    content_rows = []
+    for item in by_content.values():
+        item['erros'] = item['total'] - item['acertos']
+        item['percent'] = round(item['acertos'] / item['total'] * 100, 1) if item['total'] else 0
+        content_rows.append(item)
+    content_rows.sort(key=lambda x: (x['percent'], -x['total'], x['conteudo']))
+
+    # Evolução em blocos de até 10 respostas para mostrar se o desempenho está melhorando.
+    evolution = []
+    for start in range(0, len(answers), 10):
+        chunk = answers[start:start + 10]
+        acertos = sum(1 for a in chunk if a.correta)
+        total = len(chunk)
+        evolution.append({
+            'bloco': len(evolution) + 1,
+            'total': total,
+            'acertos': acertos,
+            'percent': round(acertos / total * 100, 1) if total else 0
+        })
+
+    strongest = sorted(rows, key=lambda x: (-x['percent'], -x['total']))[:3]
+    weakest = sorted(
+        [r for r in rows if r['total'] >= 3],
+        key=lambda x: (x['percent'], -x['total'])
+    )[:3]
+
+    return render_template(
+        'statistics.html',
+        stats=stats,
+        rows=rows,
+        content_rows=content_rows,
+        evolution=evolution,
+        strongest=strongest,
+        weakest=weakest,
+        plan_days_remaining=plan_days_remaining(user)
+    )
 
 # ---------------- ADMIN ----------------
 @app.route('/admin')
@@ -1731,7 +1864,15 @@ def admin_set_plan(user_id):
     if not user or plano not in PLANS:
         flash('Usuário ou plano inválido.', 'danger')
         return redirect(url_for('admin_users'))
-    user.plano = plano
+    if plano == 'FREE':
+        user.plano = 'FREE'
+        user.plan_started_at = None
+        user.plan_expires_at = None
+    else:
+        now = datetime.utcnow()
+        user.plano = plano
+        user.plan_started_at = now
+        user.plan_expires_at = now + timedelta(days=PLAN_DURATION_DAYS)
     db.session.commit()
     flash(f'Plano de {user.username} atualizado para {PLANS[plano]}.', 'success')
     return redirect(url_for('admin_users'))
@@ -2219,6 +2360,8 @@ def ensure_phase1_schema():
         'referral_balance': 'NUMERIC(10, 2)',
         'referral_total_earned': 'NUMERIC(10, 2)',
         'pix_key': 'VARCHAR(160)',
+        'plan_started_at': 'TIMESTAMP NULL',
+        'plan_expires_at': 'TIMESTAMP NULL',
     }
 
     for name, definition in additions.items():
@@ -2248,6 +2391,13 @@ def ensure_phase1_schema():
     db.session.execute(
         sql_text('UPDATE "user" SET referral_total_earned = 0 WHERE referral_total_earned IS NULL')
     )
+    # Usuários pagos que já existiam antes da Fase 4 recebem uma vigência inicial
+    # de 30 dias a partir da migração, sem apagar o plano atual.
+    now = datetime.utcnow()
+    for user in User.query.filter(User.plano != 'FREE').all():
+        if user.plan_expires_at is None:
+            user.plan_started_at = now
+            user.plan_expires_at = now + timedelta(days=PLAN_DURATION_DAYS)
     db.session.commit()
 
 
