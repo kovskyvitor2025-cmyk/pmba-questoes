@@ -1179,11 +1179,10 @@ def admin_import():
                 )
                 flash(mensagem, 'danger')
 
-                # Envia todos os erros em uma única mensagem, mantendo
-                # a linha do CSV e o motivo de cada falha. Assim o administrador
-                # recebe o relatório completo de uma única vez.
-                relatorio = '<br>'.join(errors)
-                flash(relatorio, 'danger')
+                # Cada erro é enviado separadamente para ficar legível
+                # mesmo quando o CSV possui vários problemas.
+                for error in errors:
+                    flash(error, 'danger')
 
                 return redirect(url_for('admin_import'))
 
@@ -1226,43 +1225,56 @@ def admin_import():
 @app.route('/admin/questoes/limpar-duplicadas', methods=['GET', 'POST'])
 @admin_required
 def admin_remove_duplicate_questions():
-    """Remove duplicatas já existentes e preserva a questão de menor ID.
+    """Lista duplicatas no GET e remove duplicatas somente no POST."""
 
-    GET apenas informa quantas duplicatas existem; a remoção continua exigindo
-    POST para evitar exclusão acidental ao abrir/atualizar uma URL.
-    """
-    try:
-        if request.method == 'GET':
-            questions = Question.query.order_by(Question.id.asc()).all()
-            seen = set()
-            duplicate_count = 0
-            for q in questions:
-                data = {
-                    'categoria': q.categoria,
-                    'banca': q.banca,
-                    'ano': q.ano,
-                    'materia_id': q.materia_id,
-                    'conteudo_id': q.conteudo_id,
-                    'enunciado': q.enunciado,
-                    'alternativa_a': q.alternativa_a,
-                    'alternativa_b': q.alternativa_b,
-                    'alternativa_c': q.alternativa_c,
-                    'alternativa_d': q.alternativa_d,
-                    'alternativa_e': q.alternativa_e,
-                    'gabarito': q.gabarito,
-                }
-                fingerprint = question_fingerprint(data)
-                if fingerprint in seen:
-                    duplicate_count += 1
-                else:
-                    seen.add(fingerprint)
-            flash(
-                f'Foram encontradas {duplicate_count} duplicata(s). '
-                'A remoção só acontece quando o botão de limpeza for enviado.',
-                'info'
+    # GET = apenas visualizar. Nenhuma questão é alterada.
+    if request.method == 'GET':
+        questions = (
+            Question.query
+            .options(
+                joinedload(Question.materia),
+                joinedload(Question.conteudo)
             )
-            return redirect(url_for('admin_questions'))
+            .order_by(Question.id.asc())
+            .all()
+        )
 
+        seen = {}
+        duplicates = []
+
+        for q in questions:
+            data = {
+                'categoria': q.categoria,
+                'banca': q.banca,
+                'ano': q.ano,
+                'materia_id': q.materia_id,
+                'conteudo_id': q.conteudo_id,
+                'enunciado': q.enunciado,
+                'alternativa_a': q.alternativa_a,
+                'alternativa_b': q.alternativa_b,
+                'alternativa_c': q.alternativa_c,
+                'alternativa_d': q.alternativa_d,
+                'alternativa_e': q.alternativa_e,
+                'gabarito': q.gabarito,
+            }
+            fingerprint = question_fingerprint(data)
+
+            if fingerprint in seen:
+                survivor = seen[fingerprint]
+                duplicates.append({
+                    'original': survivor,
+                    'duplicata': q,
+                })
+            else:
+                seen[fingerprint] = q
+
+        return render_template(
+            'admin/duplicate_questions.html',
+            duplicates=duplicates
+        )
+
+    # POST = única operação que realmente remove duplicatas.
+    try:
         questions = Question.query.order_by(Question.id.asc()).all()
         seen = {}
         duplicates = []

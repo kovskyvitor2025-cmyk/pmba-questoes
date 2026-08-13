@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="admin-head">
+    <div>
+        <span class="tag">BANCO</span>
+        <h1>Questões duplicadas</h1>
+        <p style="margin-top:8px;">
+            Foram encontradas <strong>{{ duplicates|length }}</strong> duplicata(s).
+        </p>
+    </div>
+    <div class="admin-actions">
+        <a class="button secondary" href="{{ url_for('admin_questions') }}">Voltar ao banco</a>
+    </div>
+</div>
+
+{% if duplicates %}
+<div class="card" style="margin-bottom:20px;">
+    <div style="padding:20px;">
+        <strong>Atenção:</strong>
+        a limpeza mantém a questão original (menor ID) e remove somente a cópia.
+        Respostas e comentários associados à duplicata são transferidos para a questão original.
+    </div>
+</div>
+
+<div class="card table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Original</th>
+                <th>Duplicata</th>
+                <th>Tipo</th>
+                <th>Banca</th>
+                <th>Ano</th>
+                <th>Matéria</th>
+                <th>Conteúdo</th>
+                <th>Enunciado</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in duplicates %}
+            <tr>
+                <td>#{{ item.original.id }}</td>
+                <td>#{{ item.duplicata.id }}</td>
+                <td>{{ item.duplicata.categoria }}</td>
+                <td>{{ item.duplicata.banca }}</td>
+                <td>{{ item.duplicata.ano }}</td>
+                <td>{{ item.duplicata.materia.nome if item.duplicata.materia else '-' }}</td>
+                <td>{{ item.duplicata.conteudo.nome if item.duplicata.conteudo else '-' }}</td>
+                <td>
+                    {{ item.duplicata.enunciado[:180] }}
+                    {% if item.duplicata.enunciado|length > 180 %}...{% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card" style="margin-top:20px;">
+    <div style="padding:20px;">
+        <form method="post"
+              action="{{ url_for('admin_remove_duplicate_questions') }}"
+              onsubmit="return confirm('ATENÇÃO: remover {{ duplicates|length }} duplicata(s)? A questão original será mantida e os históricos serão preservados. Continuar?');">
+            <button class="button"
+                    type="submit"
+                    style="background:#b42318;color:white;">
+                🧹 Remover {{ duplicates|length }} duplicata(s)
+            </button>
+        </form>
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div style="padding:30px;text-align:center;">
+        <h2>Banco limpo! ✅</h2>
+        <p>Não foram encontradas questões duplicadas.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
