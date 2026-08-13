@@ -9,29 +9,68 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-<nav>
-  <a class="brand" href="{% if current_user %}{{ url_for('dashboard') }}{% else %}{{ url_for('login') }}{% endif %}" aria-label="PMBA Questões">PMBA <span>QUESTÕES</span></a>
+<nav class="main-nav">
+  <a class="brand" href="{% if current_user %}{{ url_for('dashboard') }}{% else %}{{ url_for('login') }}{% endif %}" aria-label="PMBA Questões">
+    PMBA <span>QUESTÕES</span>
+  </a>
+
   {% if current_user %}
   <div class="navlinks">
-    <a href="{{ url_for('dashboard') }}">Painel</a>
-    <a href="{{ url_for('resolver') }}">Resolver</a>
-    <a href="{{ url_for('questions') }}">Banco</a>
-    <a href="{{ url_for('simulado') }}">Simulado</a>
-    <a href="{{ url_for('error_notebook') }}">Erros</a>
-    <a href="{{ url_for('statistics') }}">Desempenho</a>
-    <a href="{{ url_for('ranking') }}">Ranking</a>
-    <a href="{{ url_for('plans') }}">Planos</a>
-    <a href="{{ url_for('feedback') }}">Feedback</a>
-    {% if current_user.is_admin %}<a href="{{ url_for('admin') }}">Admin</a>{% endif %}
-    <a href="{{ url_for('logout') }}">Sair</a>
+
+    <a class="nav-main-link" href="{{ url_for('dashboard') }}">Painel</a>
+
+    <details class="nav-dropdown">
+      <summary>📚 Estudar</summary>
+      <div class="nav-dropdown-menu">
+        <a href="{{ url_for('resolver') }}">Resolver questões</a>
+        <a href="{{ url_for('questions') }}">Banco de questões</a>
+        <a href="{{ url_for('simulado') }}">Simulados</a>
+        <a href="{{ url_for('error_notebook') }}">Caderno de erros</a>
+      </div>
+    </details>
+
+    <details class="nav-dropdown">
+      <summary>🎖️ Meu Perfil</summary>
+      <div class="nav-dropdown-menu">
+        <a href="{{ url_for('statistics') }}">Estatísticas</a>
+        <a href="{{ url_for('achievements') }}">Conquistas</a>
+        <a href="{{ url_for('ranking') }}">Ranking</a>
+        <a href="{{ url_for('my_plan') }}">Meu Plano</a>
+      </div>
+    </details>
+
+    <a class="nav-main-link" href="{{ url_for('referrals') }}">💰 Indicações</a>
+    <a class="nav-main-link" href="{{ url_for('plans') }}">💳 Planos</a>
+    <a class="nav-main-link" href="{{ url_for('feedback') }}">Feedback</a>
+
+    {% if current_user.is_admin %}
+      <a class="nav-main-link admin-link" href="{{ url_for('admin') }}">Admin</a>
+    {% endif %}
+
+    <div class="nav-user-status" title="Seu progresso">
+      <span>⚡ {{ current_user.xp or 0 }} XP</span>
+      <span>•</span>
+      <span>{{ level }}</span>
+    </div>
+
+    <a class="nav-main-link logout-link" href="{{ url_for('logout') }}">Sair</a>
   </div>
   {% endif %}
 </nav>
+
 <main>
   {% with messages=get_flashed_messages(with_categories=true) %}
     {% for cat,msg in messages %}<div class="alert {{cat}}">{{msg}}</div>{% endfor %}
   {% endwith %}
   {% block content %}{% endblock %}
 </main>
+
+<script>
+document.addEventListener('click', function(event) {
+  document.querySelectorAll('.nav-dropdown[open]').forEach(function(menu) {
+    if (!menu.contains(event.target)) menu.removeAttribute('open');
+  });
+});
+</script>
 </body>
 </html>

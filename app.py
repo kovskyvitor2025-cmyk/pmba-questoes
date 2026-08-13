@@ -1253,19 +1253,9 @@ def statistics():
             'percent': round(acertos / total * 100, 1) if total else 0
         })
 
-    # Pontos fortes só aparecem quando há dados suficientes e bom desempenho.
-    # Regra: pelo menos 3 questões respondidas e aproveitamento >= 70%.
-    strongest = sorted(
-        [r for r in rows if r['total'] >= 3 and r['percent'] >= 70],
-        key=lambda x: (-x['percent'], -x['total'])
-    )[:3]
-
-    # Prioridades: pelo menos 3 questões respondidas, priorizando menor aproveitamento.
-    # Prioridades de estudo: somente matérias com desempenho abaixo de 70%.
-    # Matérias com 70% ou mais já são consideradas pontos fortes quando têm
-    # pelo menos 3 questões respondidas.
+    strongest = sorted(rows, key=lambda x: (-x['percent'], -x['total']))[:3]
     weakest = sorted(
-        [r for r in rows if r['total'] >= 3 and r['percent'] < 70],
+        [r for r in rows if r['total'] >= 3],
         key=lambda x: (x['percent'], -x['total'])
     )[:3]
 
