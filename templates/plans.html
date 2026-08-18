@@ -2,7 +2,7 @@
 {% block content %}
 <div class="page-head"><span class="tag">ACESSO</span><h1>Planos de preparação</h1><p class="muted">Escolha sua trilha e solicite a ativação pelo WhatsApp.</p></div>
 <div class="plan-grid">
-  <div class="plan-card"><span class="plan-badge">GRATUITO</span><h2>Gratuito</h2><p>Para começar a estudar.</p><div class="price">R$ 0</div><ul><li>SD + CFO</li><li>Até {{daily_limit}} questões por dia</li><li>+3 XP por acerto</li><li>Desempenho e caderno de erros</li></ul><strong class="current">Seu plano atual: {{plan_name}}</strong></div>
+  <div class="plan-card"><span class="plan-badge">GRATUITO</span><h2>Gratuito</h2><p>Para começar a estudar.</p><div class="price">R$ 0</div><ul><li>SD + CFO</li><li>Até <strong>{{daily_limit}} questões por dia</strong></li><li>+3 XP por acerto</li><li>🔒 Estatísticas detalhadas</li><li>🔒 Caderno de erros</li><li>🔒 Simulados</li><li>🔒 WhatsApp e alertas</li><li>Desempenho e caderno de erros</li></ul><strong class="current">Seu plano atual: {{plan_name}}</strong></div>
   {% for key, title, desc, features, cls in [
     ('ELITE_SD','Elite SD','Foco total na preparação de Soldado',['Questões SD','Acesso sem limite diário','Simulados e estatísticas','Caderno de erros'],'elite'),
     ('ELITE_CFO','Elite CFO','Foco total na preparação de Oficial',['Questões CFO','Acesso sem limite diário','Simulados e estatísticas','Caderno de erros'],'elite'),

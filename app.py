@@ -149,7 +149,7 @@ XP_ERRO = 3
 BONUS_5_ACERTOS = 20
 BONUS_10_ACERTOS = 50
 BONUS_SIMULADO = 100
-FREE_DAILY_LIMIT = 20
+FREE_DAILY_LIMIT = 100
 PLAN_DURATION_DAYS = 30
 PLANS = {
     'FREE': 'Gratuito',
@@ -1161,12 +1161,21 @@ def resolver_next():
 @app.route('/simulado')
 @login_required
 def simulado():
+    user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('Os simulados são exclusivos dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     return render_template('simulado.html')
 
 @app.route('/simulado/iniciar', methods=['POST'])
 @login_required
 def simulado_start():
     user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('Os simulados são exclusivos dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     quantidade = max(5, min(int(request.form.get('quantidade', 20) or 20), 100))
     categorias = request.form.getlist('categoria')
     if categorias:
@@ -1216,6 +1225,11 @@ def quiz_result():
 @app.route('/caderno-erros')
 @login_required
 def error_notebook():
+    user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('O Caderno de Erros é exclusivo dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     items = latest_wrong_questions(session['user_id'])
     return render_template('error_notebook.html', questions=items)
 
@@ -1223,6 +1237,10 @@ def error_notebook():
 @login_required
 def my_plan():
     user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('O Caderno de Erros é exclusivo dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     return render_template(
         'my_plan.html',
         user=user,
@@ -1237,6 +1255,10 @@ def my_plan():
 @login_required
 def statistics():
     user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('As estatísticas detalhadas são exclusivas dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     stats = stats_for_user(user.id)
 
     answers = (
@@ -1966,11 +1988,15 @@ def normalize_phone(phone):
 
 
 def send_whatsapp_text(user, message, tipo='GERAL', titulo=None):
-    """Envia texto pela WhatsApp Cloud API quando configurada.
+    """Envia texto pela WhatsApp Cloud API somente para planos Elite ativos."
 
     Observação: mensagens proativas fora da janela de 24h normalmente exigem
     template aprovado pela Meta. Esta função registra sempre o resultado no banco.
     """
+    refresh_plan_status(user, commit=False)
+    if user.plano == 'FREE':
+        return False, 'Envio de WhatsApp é exclusivo dos planos Elite.'
+
     log = MessageLog(user_id=user.id, tipo=tipo, titulo=titulo, mensagem=message, status='PENDENTE')
     db.session.add(log)
     db.session.commit()
@@ -2021,6 +2047,10 @@ def send_whatsapp_text(user, message, tipo='GERAL', titulo=None):
 @login_required
 def communication_preferences():
     user = get_user()
+    refresh_plan_status(user)
+    if user.plano == 'FREE':
+        flash('O recebimento de mensagens pelo WhatsApp é exclusivo dos planos Elite.', 'warning')
+        return redirect(url_for('plans'))
     if request.method == 'POST':
         telefone = request.form.get('telefone', '').strip()
         other = User.query.filter(User.telefone == telefone, User.id != user.id).first() if telefone else None

@@ -25,19 +25,19 @@
       <div class="nav-dropdown-menu">
         <a href="{{ url_for('resolver') }}">Resolver questões</a>
         <a href="{{ url_for('questions') }}">Banco de questões</a>
-        <a href="{{ url_for('simulado') }}">Simulados</a>
-        <a href="{{ url_for('error_notebook') }}">Caderno de erros</a>
+        {% if current_user.plano != 'FREE' %}<a href="{{ url_for('simulado') }}">Simulados</a>{% else %}<a href="{{ url_for('plans') }}">🔒 Simulados <small>Elite</small></a>{% endif %}
+        {% if current_user.plano != 'FREE' %}<a href="{{ url_for('error_notebook') }}">Caderno de erros</a>{% else %}<a href="{{ url_for('plans') }}">🔒 Caderno de erros <small>Elite</small></a>{% endif %}
       </div>
     </details>
 
     <details class="nav-dropdown">
       <summary>🎖️ Meu Perfil</summary>
       <div class="nav-dropdown-menu">
-        <a href="{{ url_for('statistics') }}">Estatísticas</a>
+        {% if current_user.plano != 'FREE' %}<a href="{{ url_for('statistics') }}">Estatísticas</a>{% else %}<a href="{{ url_for('plans') }}">🔒 Estatísticas <small>Elite</small></a>{% endif %}
         <a href="{{ url_for('achievements') }}">Conquistas</a>
         <a href="{{ url_for('ranking') }}">Ranking</a>
         <a href="{{ url_for('my_plan') }}">Meu Plano</a>
-        <a href="{{ url_for('communication_preferences') }}">📱 WhatsApp</a>
+        {% if current_user.plano != 'FREE' %}<a href="{{ url_for('communication_preferences') }}">📱 WhatsApp</a>{% else %}<a href="{{ url_for('plans') }}">🔒 WhatsApp <small>Elite</small></a>{% endif %}
       </div>
     </details>
 
