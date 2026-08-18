@@ -1,1 +1,40 @@
-{% extends 'base.html' %}{% block content %}<div class="admin-head"><div><span class="tag">ADMIN</span><h1>Nova notícia</h1></div></div><div class="card"><form method="post"><label>Título<input name="titulo" value="{{item.titulo if item else ''}}" required></label><label>Resumo<textarea name="resumo" rows="5">{{item.resumo if item else ''}}</textarea></label><label>Link da notícia<input type="url" name="url" value="{{item.url if item else ''}}"></label><label><input type="checkbox" name="publicada" checked> Publicar agora</label><label><input type="checkbox" name="enviar_whatsapp"> Enviar para usuários que autorizaram notícias</label><button>Salvar notícia</button></form></div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<div class="admin-head">
+  <div>
+    <span class="tag">ADMIN</span>
+    <h1>{{ 'Editar notícia' if editing else 'Nova notícia' }}</h1>
+  </div>
+  <div class="admin-actions">
+    <a class="button secondary" href="{{ url_for('admin_news') }}">Voltar</a>
+  </div>
+</div>
+
+<div class="card">
+  <form method="post">
+    <label>Título</label>
+    <input type="text" name="titulo" value="{{ item.titulo if item else '' }}" required>
+
+    <label>Resumo</label>
+    <textarea name="resumo" rows="6">{{ item.resumo if item else '' }}</textarea>
+
+    <label>URL da notícia</label>
+    <input type="url" name="url" value="{{ item.url if item and item.url else '' }}" placeholder="https://...">
+
+    <label style="display:block;margin-top:12px;">
+      <input type="checkbox" name="publicada" {% if item and item.publicada or not editing %}checked{% endif %}>
+      Publicada
+    </label>
+
+    <label style="display:block;margin-top:8px;">
+      <input type="checkbox" name="enviar_whatsapp" {% if item and item.enviar_whatsapp %}checked{% endif %}>
+      Enviar WhatsApp
+    </label>
+
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button type="submit" class="button">{{ 'Salvar alterações' if editing else 'Publicar notícia' }}</button>
+      <a href="{{ url_for('admin_news') }}" class="button secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
