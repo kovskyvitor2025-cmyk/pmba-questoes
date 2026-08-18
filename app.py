@@ -2757,3 +2757,39 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     app.run(host='0.0.0.0', port=port, debug=debug)
+
+# =========================
+# NOTÍCIAS — EDITAR / APAGAR
+# =========================
+@app.route("/admin/noticias/editar/<int:news_id>", methods=["GET", "POST"])
+@login_required
+def admin_noticia_editar(news_id):
+    if not current_user.is_admin:
+        abort(403)
+    noticia = News.query.get_or_404(news_id)
+    if request.method == "POST":
+        noticia.titulo = request.form.get("titulo", "").strip()
+        if hasattr(noticia, "resumo"):
+            noticia.resumo = request.form.get("resumo", "").strip()
+        if hasattr(noticia, "link"):
+            noticia.link = request.form.get("link", "").strip()
+        if hasattr(noticia, "publicada"):
+            noticia.publicada = request.form.get("publicada") == "1"
+        if hasattr(noticia, "enviar_whatsapp"):
+            noticia.enviar_whatsapp = request.form.get("enviar_whatsapp") == "1"
+        db.session.commit()
+        flash("Notícia atualizada com sucesso.", "success")
+        return redirect(url_for("admin_noticias"))
+    return render_template("admin_noticia_editar.html", noticia=noticia)
+
+
+@app.route("/admin/noticias/apagar/<int:news_id>", methods=["POST"])
+@login_required
+def admin_noticia_apagar(news_id):
+    if not current_user.is_admin:
+        abort(403)
+    noticia = News.query.get_or_404(news_id)
+    db.session.delete(noticia)
+    db.session.commit()
+    flash("Notícia apagada com sucesso.", "success")
+    return redirect(url_for("admin_noticias"))

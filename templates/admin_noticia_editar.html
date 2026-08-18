@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Editar notícia{% endblock %}
+{% block content %}
+<div class="container">
+  <h1>Editar notícia</h1>
+  <form method="post" class="card form-card">
+    <label>Título</label>
+    <input name="titulo" value="{{ noticia.titulo or '' }}" required>
+    {% if noticia.resumo is defined %}
+    <label>Resumo</label>
+    <textarea name="resumo" rows="5">{{ noticia.resumo or '' }}</textarea>
+    {% endif %}
+    {% if noticia.link is defined %}
+    <label>Link</label>
+    <input name="link" value="{{ noticia.link or '' }}">
+    {% endif %}
+    {% if noticia.publicada is defined %}
+    <label><input type="checkbox" name="publicada" value="1" {% if noticia.publicada %}checked{% endif %}> Publicada</label>
+    {% endif %}
+    {% if noticia.enviar_whatsapp is defined %}
+    <label><input type="checkbox" name="enviar_whatsapp" value="1" {% if noticia.enviar_whatsapp %}checked{% endif %}> Enviar WhatsApp</label>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">Salvar alterações</button>
+    <a href="{{ url_for("admin_noticias") }}" class="btn btn-secondary">Cancelar</a>
+  </form>
+</div>
+{% endblock %}
