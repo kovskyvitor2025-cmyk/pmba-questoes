@@ -2100,6 +2100,50 @@ def admin_toggle_news(news_id):
     return redirect(url_for('admin_news'))
 
 
+@app.route('/admin/noticias/<int:news_id>/editar', methods=['GET', 'POST'])
+@admin_required
+def admin_edit_news(news_id):
+    item = db.session.get(News, news_id)
+    if not item:
+        flash('Notícia não encontrada.', 'danger')
+        return redirect(url_for('admin_news'))
+
+    if request.method == 'POST':
+        titulo = request.form.get('titulo', '').strip()
+        resumo = request.form.get('resumo', '').strip()
+        url = request.form.get('url', '').strip() or None
+
+        if not titulo:
+            flash('Informe o título da notícia.', 'danger')
+            return render_template('admin/news_form.html', item=item, editing=True)
+
+        item.titulo = titulo
+        item.resumo = resumo
+        item.url = url
+        item.publicada = request.form.get('publicada') == 'on'
+        item.enviar_whatsapp = request.form.get('enviar_whatsapp') == 'on'
+        db.session.commit()
+
+        flash('Notícia atualizada com sucesso.', 'success')
+        return redirect(url_for('admin_news'))
+
+    return render_template('admin/news_form.html', item=item, editing=True)
+
+
+@app.route('/admin/noticias/<int:news_id>/apagar', methods=['POST'])
+@admin_required
+def admin_delete_news(news_id):
+    item = db.session.get(News, news_id)
+    if not item:
+        flash('Notícia não encontrada.', 'danger')
+        return redirect(url_for('admin_news'))
+
+    db.session.delete(item)
+    db.session.commit()
+    flash('Notícia apagada com sucesso.', 'success')
+    return redirect(url_for('admin_news'))
+
+
 @app.route('/admin/mensagens')
 @admin_required
 def admin_messages():
@@ -2757,39 +2801,3 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     app.run(host='0.0.0.0', port=port, debug=debug)
-
-# =========================
-# NOTÍCIAS — EDITAR / APAGAR
-# =========================
-@app.route("/admin/noticias/editar/<int:news_id>", methods=["GET", "POST"])
-@login_required
-def admin_noticia_editar(news_id):
-    if not current_user.is_admin:
-        abort(403)
-    noticia = News.query.get_or_404(news_id)
-    if request.method == "POST":
-        noticia.titulo = request.form.get("titulo", "").strip()
-        if hasattr(noticia, "resumo"):
-            noticia.resumo = request.form.get("resumo", "").strip()
-        if hasattr(noticia, "link"):
-            noticia.link = request.form.get("link", "").strip()
-        if hasattr(noticia, "publicada"):
-            noticia.publicada = request.form.get("publicada") == "1"
-        if hasattr(noticia, "enviar_whatsapp"):
-            noticia.enviar_whatsapp = request.form.get("enviar_whatsapp") == "1"
-        db.session.commit()
-        flash("Notícia atualizada com sucesso.", "success")
-        return redirect(url_for("admin_noticias"))
-    return render_template("admin_noticia_editar.html", noticia=noticia)
-
-
-@app.route("/admin/noticias/apagar/<int:news_id>", methods=["POST"])
-@login_required
-def admin_noticia_apagar(news_id):
-    if not current_user.is_admin:
-        abort(403)
-    noticia = News.query.get_or_404(news_id)
-    db.session.delete(noticia)
-    db.session.commit()
-    flash("Notícia apagada com sucesso.", "success")
-    return redirect(url_for("admin_noticias"))

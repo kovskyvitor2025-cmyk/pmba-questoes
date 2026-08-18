@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% block title %}Notícias — Admin{% endblock %}
 {% block content %}
 <div class="admin-head">
   <div>
@@ -25,23 +26,18 @@
     <tbody>
       {% for item in news %}
       <tr>
-        <td>{{ item.created_at.strftime('%d/%m/%Y') if item.created_at else '-' }}</td>
+        <td>{{ item.created_at.strftime('%d/%m/%Y %H:%M') if item.created_at else '-' }}</td>
         <td>{{ item.titulo }}</td>
         <td>{{ 'Sim' if item.publicada else 'Não' }}</td>
         <td>{{ 'Sim' if item.enviar_whatsapp else 'Não' }}</td>
         <td>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <a class="small-btn" href="{{ url_for('admin_edit_news', news_id=item.id) }}">✏️ Editar</a>
-            <form method="post"
-                  action="{{ url_for('admin_delete_news', news_id=item.id) }}"
-                  style="display:inline;"
-                  onsubmit="return confirm('Tem certeza que deseja apagar esta notícia?');">
-              <button type="submit" class="small-btn" style="cursor:pointer;">🗑️ Apagar</button>
+            <form method="post" action="{{ url_for('admin_delete_news', news_id=item.id) }}" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja apagar esta notícia? Esta ação não pode ser desfeita.');">
+              <button type="submit" class="small-btn">🗑️ Apagar</button>
             </form>
-            <form method="post"
-                  action="{{ url_for('admin_toggle_news', news_id=item.id) }}"
-                  style="display:inline;">
-              <button type="submit" class="small-btn" style="cursor:pointer;">Alternar</button>
+            <form method="post" action="{{ url_for('admin_toggle_news', news_id=item.id) }}" style="display:inline;">
+              <button type="submit" class="small-btn">Alternar</button>
             </form>
           </div>
         </td>
