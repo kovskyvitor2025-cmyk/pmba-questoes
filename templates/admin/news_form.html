@@ -22,17 +22,21 @@
     <input type="url" name="url" value="{{ item.url if item and item.url else '' }}" placeholder="https://...">
 
     <label style="display:block;margin-top:12px;">
-      <input type="checkbox" name="publicada" {% if item and item.publicada or not editing %}checked{% endif %}>
+      <input type="checkbox" name="publicada"
+        {% if (item and item.publicada) or not editing %}checked{% endif %}>
       Publicada
     </label>
 
     <label style="display:block;margin-top:8px;">
-      <input type="checkbox" name="enviar_whatsapp" {% if item and item.enviar_whatsapp %}checked{% endif %}>
+      <input type="checkbox" name="enviar_whatsapp"
+        {% if item and item.enviar_whatsapp %}checked{% endif %}>
       Enviar WhatsApp
     </label>
 
     <div style="display:flex;gap:10px;margin-top:18px;">
-      <button type="submit" class="button">{{ 'Salvar alterações' if editing else 'Publicar notícia' }}</button>
+      <button type="submit" class="button">
+        {{ 'Salvar alterações' if editing else 'Publicar notícia' }}
+      </button>
       <a href="{{ url_for('admin_news') }}" class="button secondary">Cancelar</a>
     </div>
   </form>
